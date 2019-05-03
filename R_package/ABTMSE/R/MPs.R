@@ -1,6 +1,5 @@
-
 # ===============================================================================================================
-# === Management Procedures for ABT MSE==========================================================================
+# === Management Procedures for ABT MSE =========================================================================
 # ===============================================================================================================
 
 #' No catches (actually very small catches) (a management procedure of class MP).
@@ -14,7 +13,6 @@
 #' sapply(1:10,ZeroC,dset_example_West)
 ZeroC <- function(x,dset)mean(dset$Cobs[x,],na.rm=T)*1E-10
 class(ZeroC)<-"MP"
-
 
 
 #' Example Management Procedure 1 west using the GOM_LAR_SUV
@@ -226,8 +224,7 @@ class(UMSY_PI)<-"MP"
 #' DD_i7(1,dset_example_West)
 #' sapply(1:10,DD_i7,dset_example_West)
 DD_i7<-function(x,dset,checkfit=F) DD(x,dset,startD=1,ii=7,checkfit=checkfit)
-class(DD_i7)<-"MP"
-
+class(DD_i7) <- "MP"
 
 
 #' A rapid 3 parameter observation error only delay difference model linked to 40-10 harvest control rule FOR INDEX 7 (GOM_LAR_SUV) conditioned on effort and parameterized with UMSY and MSY leading (a management procedure of class MP).
