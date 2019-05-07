@@ -4,7 +4,7 @@
 \alias{areaplot}
 \title{Plot area definitions of an OMI, OM or MSE object}
 \usage{
-areaplot(.Object)
+areaplot(.Object, xadj = NA, yadj = NA)
 }
 \arguments{
 \item{.Object}{an object of class OMI, OM or MSE}

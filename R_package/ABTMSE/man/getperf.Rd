@@ -4,10 +4,19 @@
 \alias{getperf}
 \title{Calculate performance metrics.}
 \usage{
-getperf(MSE, rnd = 3, outdir = NA)
+getperf(MSE, rnd = 3, outdir = NA, quantiles = c(0.05, 0.95),
+  quantile = F)
 }
 \arguments{
 \item{MSE}{an object of class MSE}
+
+\item{rnd}{number of significant digits to round tabulated values}
+
+\item{outdir}{a directory for the table}
+
+\item{quantiles}{a vector 2 long of upper and lower quantiles to calculate and include in the table if quantile=T}
+
+\item{quantile}{logical: should quantiles be calculated and included in the table}
 }
 \value{
 a list n stocks long each with a data frame of performance metrics (columns) by management procedure (row) \code{MSE}.
@@ -17,15 +26,14 @@ a list n stocks long each with a data frame of performance metrics (columns) by 
   \item Y30. Mean yield over years 21-30 of the projection
   \item PGK. Probability of Green Kobe (F<FMSY AND B>BMSY) region over all years of the projection
   \item POF. Probability of Over-Fishing (F>FMSY) over all years of the projection
-  \item POFed. Probability of Over-Fished status (B<BMSY) over all years of the projection
-  \item D10. Mean depletion (SSB relative to unfished) over the first 10 years of the projection
-  \item D20. Mean depletion (SSB relative to unfished) over years 11-20 of the projection
-  \item D30. Mean depletion (SSB relative to unfished) over years 21-30 of the projection
-  \item LD. Mean depletion (SSB relative to unfished) over all projected years
-  \item RSSB. Mean Spawning Stock Biomass in final projection year relative to zero fishing
-  \item LRSSB. Mean Spawning Stock Biomass over all projection years relative to zero fishing
+  \item POS. Probability of Over-Fished status (B<BMSY) over all years of the projection
+  \item D10. Mean depletion (SSB relative to unfished) after 10 years of the projection
+  \item D20. Mean depletion (SSB relative to unfished) after 20 years of the projection
+  \item D30. Mean depletion (SSB relative to unfished) after 30 years of the projection
+  \item LD. Mean spawning stock depletion over all projected years
+  \item DNC Spawning stock Depletion in final projection year relative to zero fishing
+  \item LDNC. Lowest Spawning Stock depletion over all projection years relative to zero fishing
   \item AAVY. Mean Average Annual Variability in Yield over all projections
-  \item carat. weight of the diamond (0.2--5.01)
   ...
 }
 }

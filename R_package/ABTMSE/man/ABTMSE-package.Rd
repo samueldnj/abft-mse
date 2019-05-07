@@ -10,15 +10,15 @@ Testing management systems for Atlantic Bluefin Tuna
 \tabular{ll}{
 Package: \tab ABTMSE\cr
 Type: \tab Package\cr
-Version: \tab 2.3\cr
-Date: \tab 2018-01-08\cr
+Version: \tab 2.5.1\cr
+Date: \tab 2018-03-17\cr
 License: \tab GPL-2\cr
 Depends: \tab methods\cr
 }
 }
 \author{
 Tom Carruthers
-<t.carruthers@fisheries.ubc.ca>
+<bluemattersci@gmail.coma>
 }
 \references{
 http://www.iccat.int/Documents/CVSP/CV072_2016/n_7/CV07201782.pdf

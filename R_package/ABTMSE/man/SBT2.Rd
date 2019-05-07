@@ -2,9 +2,10 @@
 % Please edit documentation in R/MPs.R
 \name{SBT2}
 \alias{SBT2}
-\title{One of two Southern Bluefin Tuna management procedures that uses recruitment trajectory to adjust TAC (a management procedure of class MP).}
+\title{A Southern Bluefin Tuna management procedure that uses recruitment trajectory to adjust TAC (a management procedure of class MP).}
 \usage{
-SBT2(x, dset, epsB = 0.25, epsR = 0.75, tauR = 5, tauB = 7, gamma = 1)
+SBT2(x, dset, epsB = 0.25, epsR = 0.75, tauR = 5, tauB = 7,
+  gamma = 1)
 }
 \arguments{
 \item{x}{a simulation number.}
@@ -25,7 +26,7 @@ SBT2(x, dset, epsB = 0.25, epsR = 0.75, tauR = 5, tauB = 7, gamma = 1)
 a TAC recommendation arising from \code{x, dset, epsB, epsR, tauR, tauB, gamma}.
 }
 \description{
-One of two Southern Bluefin Tuna management procedures that uses recruitment trajectory to adjust TAC (a management procedure of class MP).
+A Southern Bluefin Tuna management procedure that uses recruitment trajectory to adjust TAC (a management procedure of class MP).
 }
 \examples{
 SBT2(1,dset_example_East)

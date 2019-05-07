@@ -4,8 +4,8 @@
 \alias{PPlot}
 \title{Performance plot}
 \usage{
-PPlot(MSE, Pnames = c("C10", "C30", "D30", "LD", "DNC", "LDNC", "PGK",
-  "AAVC"))
+PPlot(MSE, Pnames = c("AvC30", "C10", "C30", "D30", "LD", "DNC", "LDNC",
+  "PGK", "AAVC", "Br30"))
 }
 \arguments{
 \item{MSE}{An MSE object}

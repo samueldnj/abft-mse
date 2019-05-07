@@ -29,7 +29,10 @@ plotindex2<-function(Base,pCPUE){
 #' areaplot(OM_1)
 #' areaplot(OMI_1)
 #' areaplot(MSE_example)
-areaplot<-function(.Object){
+areaplot<-function(.Object,xadj=NA,yadj=NA){
+
+  if(is.na(xadj[1]))xadj=rep(0,length(.Object@areanams))
+  if(is.na(yadj[1]))yadj=rep(0,length(.Object@areanams))
 
   xlimy<-c(-100,40)
   ylimy<-c(-25,65)
@@ -42,9 +45,12 @@ areaplot<-function(.Object){
   map(xlim=xlimy+c(-5,5),ylim=ylimy+c(-5,5),add=T,fill=T,col="light grey")
   map(xlim=xlimy,ylim=ylimy,add=T,fill=F,col="light grey",lwd=4)
    for(i in 1:length(.Object@areanams)){
-    polygon(.Object@area_defs[[i]],border='red')
-    text(mean(.Object@area_defs[[i]]$x),mean(.Object@area_defs[[i]]$y),.Object@areanams[i],col='RED',font=2,cex=0.8)
-  }
+    polygon(.Object@area_defs[[i]],border='black')
+    text(mean(.Object@area_defs[[i]]$x)+xadj[i],mean(.Object@area_defs[[i]]$y)+yadj[i],paste0(i,": ",.Object@areanams[i]),col='red',font=2,cex=0.8)
+   }
+  axis(1)
+  axis(2)
+
   #map(xlim=xlimy,ylim=ylimy,add=T,fill=T,col="light grey")
 
 }

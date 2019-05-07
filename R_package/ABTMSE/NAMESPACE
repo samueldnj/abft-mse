@@ -8,6 +8,7 @@ export(
     "make_fit_reports",
     "make_summary_report",
     "make_comp_report",
+    "MSE_report",
     "readme",
 
     "DD_i7",
@@ -20,6 +21,9 @@ export(
     "CurC100",
     "CurC50",
     "CurC150",
+    "CurC25",
+    "CurC75",
+    "CurC125",
     "EMP1w",
     "EMP1e",
     "EMP2w",
@@ -45,6 +49,15 @@ export(
     "MCD",
     "MeanC",
 
+    "CSMP",
+    "xMPi",
+
+    "runMulti",
+    "multiMSE",
+
+
+    "Deterministic",
+
     "getperf",
     "PPlot",
     "custombar",
@@ -63,6 +76,8 @@ export(
     "Overage_20",
     "Overage_30",
 
+
+    "AvC30",
     "C10",
     "C20",
     "C30",
@@ -77,6 +92,9 @@ export(
     "POF",
     "POS",
     "AAVC",
+    "Br30",
+
+    "RD30",
 
     "tomt",
     "TEG",
@@ -86,6 +104,8 @@ export(
     "M3read",
     "ADMBrep",
     "SRopt",
+    "SRopt2",
+    "SRplot",
     "getBH",
     "getHS",
     "calcVBpars",
@@ -105,6 +125,9 @@ export(
     "makeTransparent",
     "musmooth",
     "MSY_FAST",
+    "MSYMLE_parallel",
+    "optMSY_eq",
+    "MSYCalcs",
     "getMSYfast",
     "sdensplot",
     "meanFs",
@@ -131,9 +154,16 @@ export(
     "sourceall",
 
     "MatM_Ref",
+    "Rec_Ref",
+    "SSB_Dep_Ref",
     "Mat_Ref",
     "Steep_Ref",
     "SSBref",
+
+    "MSYMLE",
+    "optMSY_eq",
+    "MSYCalcs",
+
 
     "read.hessian",
     "pin_from_par",
@@ -146,7 +176,9 @@ export(
 
     "DesignEffect",
 
-    "tiny"
+    "tiny",
+
+    "Shiny"
 )
 exportClasses(
     "OMI",

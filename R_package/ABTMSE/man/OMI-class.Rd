@@ -52,6 +52,9 @@
 \item{len_age}{an array of length-at-age [stock, age, year]}
 \item{wt_age}{an array of weight-at-age [stock, age, year]}
 \item{Fec}{an array of spawning biomass-at-age [stock, age, year]}
+\item{SRtype}{a character vector denoting the form of the stock-recruitment relationship: BH Beverton Holt, HS Hockey Stick [stock]}
+\item{steep}{a vector of steepness by stock [stock]}
+\item{SSBpR}{a vector of unfished spawning stock biomass per recruit [stock]}
 \item{spawns}{the spawning season for each stock (a vector nstocks long)}
 \item{canspawn}{an array [nstock, nareas] indicating which areas each stock can spawn in (then calculated by the fraction of SSB in each area during spawns)}
 \item{Ma}{mortality at age [nstock, nages]}
@@ -60,6 +63,7 @@
 \item{nCPUEq}{the number of CPUE indices used in the model fitting}
 \item{nCPUEobs}{the number of CPUE index observations used in model fitting}
 \item{CPUEobs}{a data frame of CPUE catch rate observations [year, stock, area, subyear, fleet, index] fitted against vulnerable biomass}
+\item{CPUEwt}{a vector of CPUE index weights [nCPUEq]}
 \item{nE}{the number of partial F series (typically nfleets)}
 \item{nEobs}{the number effort observations (partial F's) one for each catch observations}
 \item{Eobs}{a data frame of effort observations one line per observation [year, subyear, area, fleet, effort]}
@@ -67,9 +71,10 @@
 \item{CLobs}{a data frame of length observations [year, subyear]}
 \item{HCobs}{an array of historical catch observations [year x subyear x area x age]}
 \item{RAI}{an array of relative abundance - this is pass through data - it is the master index used to derive the standardized effort (partial F data Eobs)}
-\item{nI}{the number of fishery independent indices (e.g. 2 one spawning biomass survey in the GOM and MED)}
+\item{nI}{the number of fishery independent indices (e.g. 2: a spawning biomass survey in the GOM and MED)}
 \item{nIobs}{the number of fishery independent indices}
 \item{Iobs}{a data frame of fishery independent relative abundance observations [year, subyear, area, stock, index number, type (biomass/ssb), index]}
+\item{Iwt}{a vector of fishery independent relative abundance index weights [nI]}
 \item{nPSAT}{the number of electronic tags of known stock of origin}
 \item{PSAT}{a data frame of electronic tag movements [stock, age, subyear, duration til recapture (subyears), from area, to area, number of tags]}
 \item{nPSAT2}{the number of electronic tags of unknown stock of origin}
@@ -108,6 +113,7 @@
 \item{selCV}{the prior on selectivity parameters}
 \item{SSBincCV}{the prior precision of SSB trend}
 \item{BSfracCV}{the prior precision of the Seasonal biomass fraction}
+\item{R0diffCV}{the CV on the log ratio of early versus late R0 for the same stock (where applicable)}
 \item{nLHw}{the number of likelihood components (for weighting)}
 \item{LHw}{a vector nLHw long specifying the relative weight of the various data types 1 catch, 2 cpue, 3 FIindex, 4 Lcomp, 5 SOO, 6 PSAT, 7 PSAT2, 8 RecDev, 9 mov, 10 sel, 11 SRA, 12 SSB, 13 E-W Distr}
 \item{muR_ini}{a vector np long specifying an initial value of mean absolute recruitment}

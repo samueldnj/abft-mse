@@ -2,7 +2,7 @@
 % Please edit documentation in R/Performance_metrics.R
 \name{LD}
 \alias{LD}
-\title{Depletion (SSB relative to unfished SSB given current recruitment dynamics) all projected years (a performance metrics function of class PM)}
+\title{Depletion (spawning biomass relative to dynamic B0) all projected years (a performance metrics function of class PM)}
 \usage{
 LD(MSE, pp = 1)
 }
@@ -13,7 +13,7 @@ LD(MSE, pp = 1)
 a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
 }
 \description{
-Depletion (SSB relative to unfished SSB given current recruitment dynamics) all projected years (a performance metrics function of class PM)
+Depletion (spawning biomass relative to dynamic B0) all projected years (a performance metrics function of class PM)
 }
 \examples{
 loadABT()

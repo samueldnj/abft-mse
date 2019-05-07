@@ -243,7 +243,7 @@ domov3<-function(Ntemp,movtemp){ # S P R  x  S P R R
 ADMBrep<-function(repfile,st,ADMBdim,quiet=T)  tomt(array(scan(repfile,skip=st,nlines=prod(ADMBdim[1:(length(ADMBdim)-1)]),quiet=quiet),ADMBdim[length(ADMBdim):1]))
 
 
-MSY_FAST<-function(FML,iALK,N,wt_age,M_age,mat_age,R0s,fixpars,toly=1e-3,rnams=c("East","West"),SRtypes=c('BH','BH')){
+MSY_FAST<-function(FML,iALK,N,wt_age,M_age,mat_age,R0s,fixpars,toly=1e-3,rnams=c("East","West"),SRtypes=c('BH','HS')){
   # FML                                    # s, r, f, l
   # iALK                                   # p, a, l
 
@@ -270,9 +270,9 @@ MSY_FAST<-function(FML,iALK,N,wt_age,M_age,mat_age,R0s,fixpars,toly=1e-3,rnams=c
 getMSYfast<-function(lnq,Fa,Ma,Wa,mat,R0,fixpar,SRtype,mode=1,nits=150){
 
   if(grepl("BH",SRtype)){
-    h=0.6+1/(1+exp(-fixpar))*0.4
+    h=fixpar
   }else if(grepl("HS",SRtype)){
-    inflect=1/(1+exp(-fixpar))
+    inflect=fixpar
   }
 
   q<-exp(lnq)
@@ -536,21 +536,41 @@ meanFs<-function(FML,iALK,N,wt_age,rnams=c("East","West")){
   Find<-TEG(dim(Ftot))
   Ftot[Find]<-FML[Find[,2:5]]*iALK[Find[,c(1,6,5)]] # p s r f a x p a l
   #FM<-apply(Ftot,c(1,2,3,6), sum) # p, s, r, a    (sum over lengths and fleets)
-  wFM2<-apply(Ftot,c(1,6),sum)/nr
-  wFM2
-  #muN<-apply(N,1:3,mean)          # p, s, a       (mean over areas)
-  #sumN<-apply(N,1:3,sum)          # p, s, a       (mean over areas)
-  #Nind<-TEG(dim(N))
-  #Nr<-array(0,dim(N))
-  #Nr[Nind]<-N[Nind]/muN[Nind[,1:3]]             # p, s, a, r      (normalized to mean 1)
-  #wFM<-array(NA,dim(FM))            # p, s, r, f, a (weighted fishing mortality rate at age)
-  #FMind<-TEG(dim(FM))
-  #wFM[FMind]<-FM[FMind]*(N[FMind[,c(1,2,4,3)]]/sumN[FMind[,c(1,2,4)]])
-  #wFM2<-apply(wFM,c(1,4),sum) #what is the F at age profile?
+  #wFM2<-apply(Ftot,c(1,6),sum)/nr
+  #wFM2
 
-  #matplot(t(wFM2),type='l',xlab="Age",ylab="F")
-  #legend('topright',legend=rnams,bty='n',text.col=c("black","red"))
 
+  np<-dim(iALK)[1]
+  na<-dim(iALK)[2] # number of ages
+  nl<-dim(iALK)[3] # number of length classes
+  ns<-dim(FML)[1] # number of seasons
+  nr<-dim(FML)[2] # number of areas
+  nf<-dim(FML)[3] # number of fleets
+  WFM2<-array(NA,c(np,na))
+
+  for(pp in 1:np){
+
+    iALKp<-iALK[pp,,]
+    Np<-N[pp,,,]
+
+    FMLA<-array(NA,c(ns,nr,nf,nl,na))
+    FMLAind<-TEG(dim(FMLA))
+    FMLind<-FMLAind[,1:4]  # ns, nr, nf, nl
+    iALKind<-FMLAind[,5:4] # na, nl
+    FMLA[FMLAind]<-FML[FMLind]*iALKp[iALKind]
+    FMA<-apply(FMLA,c(1,5,2),sum) # sum over fleets and lengths  ns, na, nr
+
+    # smooth (weighted by season x area)
+    NSR<-apply(Np,c(1,3),sum) # number by season and area  ns, nr
+    FMAind<-TEG(dim(FMA))
+    NSRind<-FMAind[,c(1,3)]
+    wt<-array(NA,dim(FMA)) # weighted Fs by area and season
+    wt[FMAind]<-FMA[FMAind]*NSR[NSRind] # ns, na, nr
+    sel1<-apply(wt,1:2,sum)/apply(NSR,1,sum)
+    WFM2[pp,]<-apply(sel1,2,sum)
+
+  }
+  WFM2
 }
 
 
@@ -642,7 +662,7 @@ timeFs<-function(FML,iALK,N,wt_age){
 
 getBH<-function(pars,SSB,rec,SSBpR,mode=1,plot=F,R0){
 
-  h<-0.6+1/(1+exp(-pars[1]))*0.4
+  h<-pars
 
   recpred<-((0.8*R0*h*SSB)/(0.2*SSBpR*R0*(1-h)+(h-0.2)*SSB))
 
@@ -670,7 +690,7 @@ getBH<-function(pars,SSB,rec,SSBpR,mode=1,plot=F,R0){
 
 getHS<-function(pars,SSB,rec,SSBpR,mode=1,plot=F,R0){
 
-  inflect<-exp(pars[1])/(1+exp(pars[1]))
+  inflect<-pars
   SSB0<-R0*SSBpR
 
   recpred<-rep(R0,length(SSB))
@@ -705,6 +725,225 @@ getHS<-function(pars,SSB,rec,SSBpR,mode=1,plot=F,R0){
 
 }
 
+
+getHS_BFT<-function(inflect,ind_inflect,SSB,rec,SSBpR,mode=1,plot=F,R0){
+
+  recpred<-rep(R0,length(SSB))
+  SSB0<-R0*SSBpR
+  cond<-SSB<inflect*SSB0
+  recpred[cond]<-R0*SSB[cond]/(SSB0*inflect)
+
+
+  if(plot){
+    ord<-order(SSB)
+    plot(SSB[ord],rec[ord],ylim=c(0,max(rec,R0)),xlim=c(0,max(SSB,R0*SSBpR)),xlab="",ylab="",col="#0000ff95",pch=19)
+    points(SSB[ind_inflect],rec[ind_inflect],col="red",pch=19)
+    SSB2<-seq(0,R0*SSBpR,length.out=500)
+    recpred2<-rep(R0,length(SSB2))
+    cond<-SSB2<inflect*SSB0
+    recpred2[cond]<-R0*SSB2[cond]/(SSB0*inflect)
+
+    lines(SSB2,recpred2,col='blue')
+    abline(v=c(inflect*SSB0,SSB0),lty=2,col='red')
+    #h<-0.2/inflect
+    #R0h<-R0*h
+    abline(h=c(R0),lty=2,col='red')
+    legend('topright',legend=c(paste0("Inflec. = ",round(inflect,3)),paste0("lnR0 = ",round(log(R0),3))),bty='n')
+  }
+
+  if(mode==1){
+    #return(sum(((recpred-rec)/10000)^2))
+    return(-sum(dnorm(log(recpred)-log(rec),0,0.5,log=T))-dnorm(pars[1],0,4,log=T))
+    #return(-sum(dnorm(recpred,rec,rec*0.5,log=T)))
+  }else{
+    return(rec-recpred)
+  }
+
+}
+
+
+SRopt2<-function(out,plot=F,quiet=F,years=NULL,type=c("BH","BH")){
+
+
+  blocksize<-sum(out$RDblock==1)
+
+  yrs1<-match(1:max(out$RDblock),out$RDblock)+floor(blocksize/2)
+  yrs1[yrs1>out$ny]<-out$ny
+  yrs<-yrs1
+  if(!is.null(years))yrs<-yrs[yrs1>=years[1]&yrs1<=years[2]]
+  paryrs<-match(yrs,yrs1)
+
+  opt<-new('list')
+  resid<-new('list') #array(NA,c(out$np,3))
+  pnam<-c("East","West")
+
+  Rec<-apply(out$N[,,out$spawns[1],1,],1:2,sum)*exp(out$M_age[,1])# got to add back in mortality from end of time step
+
+  if(plot)par(mfrow=c(1,out$np),mai=c(0.4,0.5,0.1,0.05),omi=c(0.5,0.5,0.01,0.01))
+
+  opt<-new('list')
+  par<-rep(NA,2)
+  VC<-new('list')
+
+  for(pp in out$np:1){
+
+    surv<-exp(-cumsum(c(0,out$M_age[pp,1:(out$na-1)])))
+    SSBpR=sum(surv*out$mat_age[pp,]*out$wt_age[out$ny,,pp]) #SSBpR based on M, mat and growth
+    SSBpR=SSBpR+surv[out$na]*exp(-out$M_age[pp,out$na])/(1-exp(-out$M_age[pp,out$na]))*out$mat_age[pp,out$na]*out$wt_age[out$ny,out$na,pp]
+    SSB=out$SSB[pp,yrs,out$spawns[pp]]
+    yr_nam<-(OMI@years[1]:OMI@years[2])[yrs]
+    R0<-out$R0[pp]#SSB0[pp]/SSBpR
+
+    rec<-Rec[pp,yrs]
+
+    if(type[pp]=="BH"){
+
+      tpar<-(out$h[pp]-0.6)/0.4
+      if(tpar==0){
+        par[pp]=-1E10
+      }else{
+        par[pp]<-log(tpar/(1-tpar))
+      }
+
+      devs<-getBH(par[pp],SSB,rec,SSBpR,mode=2,plot=plot,R0=R0)
+      resid[[pp]]<-data.frame(yrs=yr_nam,SSB=SSB,rec=rec,devs=devs)
+      VC[[pp]]<-matrix(0,nrow=1)
+
+    }else if(type[pp]=="HS"){
+
+      ind_inflect<-yr_nam<1996&yr_nam>1989
+      SSB_inflect<-mean(SSB[ind_inflect])
+      SSB0<-R0*SSBpR
+      inflect<-SSB_inflect/SSB0
+      par[pp]<-log(inflect/(1-inflect))
+      VC[[pp]]<-matrix(0,nrow=1)
+
+      devs<-getHS_BFT(yr_nam,SSB,rec,SSBpR,mode=2,plot=plot,R0=R0)
+      resid[[pp]]<-data.frame(yrs=yrs,SSB=SSB,rec=rec,devs=devs)
+
+    }
+
+    if(plot)legend('topleft',legend=pnam[pp],text.font=2,bty='n')
+
+  }
+
+  if(plot)  mtext("Spawning Biomass (kg)",1,line=0.8,outer=T);
+  if(plot)  mtext("Recruits (n)",2,line=0.8,outer=T)
+  lnR0<-log(out$R0)
+  return(list(type=rep(type,out$np),par1=par,lnR0=lnR0,VC=VC,resid=resid))
+
+}
+
+
+SRplot<-function(out,years=NULL,type=c("BH","BH","HS","BH"),plot=T,SRminyr=c(1,1,1,1),SRmaxyr=c(1,1,1,1)){
+
+  # what recruitments are estimated
+  nt<-rep(1,2)
+  yswitch<-rep(NA,2)
+
+  for(pp in 1:out$np) {
+    recs<-unique(out$R0[pp,])
+    nt[pp]<-length(recs)
+    if(nt[pp]>1)yswitch[pp]=match(recs[2],out$R0[pp,])
+  }
+
+  tott<-sum(nt)
+  if(tott==2){
+    row1<-row2<-c(1,1,2,2)
+  }else{
+    if(nt[1]==1){
+      row1<-c(tott,1,1,tott)
+      tott<-tott+1
+      n1<-1
+    }else{
+      row1<-c(1,1,2,2)
+      n1=2
+    }
+
+    if(nt[2]==1){
+      row2<-c(tott+1,nt[1]+1,nt[1]+1,tott+1)
+    }else{
+      row2<-c(1,1,2,2)+nt[1]
+    }
+  }
+
+  if(plot){
+   par(mfrow=c(out$np,2),mai=c(0.4,0.5,0.3,0.05),omi=c(0.5,0.5,0.5,0.01))
+   layout(cbind(row2,row1))
+  }
+  #for(i in 1:sum(nt))plot(i,i)
+
+  blocksize<-sum(out$RDblock==1)
+
+  resid<-new('list') #array(NA,c(out$np,3))
+  pnam<-c("East","West")
+
+  Rec<-out$Rec_wd#mu# got to add back in mortality from end of time step
+  VC<-new('list')
+
+  i=1
+  R0s<-rep(NA,sum(nt))
+  par<-rep(NA,sum(nt))
+
+  for(pp in 1:out$np){
+
+    Fec<-out$mat_age[pp,]*out$wt_age[out$ny,,pp]
+    surv<-exp(-cumsum(c(0,out$M_age[pp,1:(out$na-1)])))
+    SSBpR=sum(surv*Fec) #SSBpR based on M, mat and growth
+    SSBpR=SSBpR+surv[out$na]*exp(-out$M_age[pp,out$na])/(1-exp(-out$M_age[pp,out$na]))*Fec[out$na]
+
+    for(tt in 1:nt[pp]){
+
+      ind<-(1:out$ny)[unique(out$R0[pp,])[tt] == out$R0[pp,]]
+      if(tt==1)R0ind<-1
+      if(tt==2)R0ind<-out$ny
+      R0<-out$R0[pp,R0ind]
+      R0s[i]<-R0
+      yr_nam<-years[1]+ind-1
+      rec<-out$Rec_wd[pp,ind]
+      SSB=out$SSB_mu[pp,ind]
+      if(type[i]=="BH"){
+        par[i]<-out$h[pp,R0ind]
+      }else if(type[i]=="HS"){
+        if(pp==2)ind_inflect<-yr_nam<1996&yr_nam>1989 # hinge 1990-1995 in West
+        if(pp==1)ind_inflect<-(yr_nam==1973)          # hinge at 1973 in the East
+        SSB_inflect<-mean(SSB[ind_inflect])
+        SSB0<-R0*SSBpR
+        par[i]<-SSB_inflect/SSB0
+      }
+      if(type[i]=="BH"){
+        devs<-getBH(par[i],SSB,rec,SSBpR,mode=2,plot=plot,R0=R0)
+      } else if(type[i]=="HS"){
+        devs<-getHS_BFT(par[i],ind_inflect,SSB,rec,SSBpR,mode=2,plot=plot,R0=R0)
+      }
+      if(plot)legend('top',paste(SRminyr[i]+years[1]-1,"-",SRmaxyr[i]+years[1]-1),bty='n',text.font=2)
+      resid[[i]]<-data.frame(yrs=yr_nam,SSB=SSB,rec=rec,devs=devs)
+      VC[[i]]<-matrix(0,nrow=1)
+      i<-i+1
+
+      if(plot&nt[pp]==1)mtext(c("East stock","West stock")[pp],3,line=0.8)
+
+    }
+  }
+
+  R0s_now<-SRtype_now<-par_now<-rep(NA,2)
+  R0s_now[1]<-R0s[nt[1]]
+  R0s_now[2]<-R0s[nt[1]+nt[2]]
+  SRtype_now[1]<-type[nt[1]]
+  SRtype_now[2]<-type[nt[1]+nt[2]]
+  par_now[1]<-par[nt[1]]
+  par_now[2]<-par[nt[1]+nt[2]]
+
+  if(plot){
+    if(sum(nt)>2)mtext(c("West stock","East stock"),3,at=c(0.25,0.75),line=0.8,outer=T)
+    mtext("Spawning Biomass (kg)",1,line=0.8,outer=T)
+    mtext("Recruits (n)",2,line=0.8,outer=T)
+  }
+
+  lnR0<-log(R0)
+  return(list(type=type,par1=par,lnR0=lnR0,VC=VC,resid=resid,R0s_now=R0s_now,SRtype_now=SRtype_now,par_now=par_now))
+
+}
 
 
 SRopt<-function(out,plot=F,quiet=F,years=NULL,type="BH",R0p=NA){
@@ -742,7 +981,6 @@ SRopt<-function(out,plot=F,quiet=F,years=NULL,type="BH",R0p=NA){
 
     R0<-R0p[pp]#SSB0[pp]/SSBpR
 
-
     #fscale<-getSteepness(pars,SSB=SSB,rec=rec, SSBpR=SSBpR,mode=1,plot=F)
     #opt<-nlm(getSR,p=pars,typsize=c(0.5,log(R0temp)),fscale=fscale,hessian=T,print.level=2,
 
@@ -774,8 +1012,7 @@ SRopt<-function(out,plot=F,quiet=F,years=NULL,type="BH",R0p=NA){
   if(plot)  mtext("Spawning Biomass (kg)",1,line=0.8,outer=T);
   if(plot)  mtext("Recruits (n)",2,line=0.8,outer=T)
 
-  if(type=="BH"){
-
+  if(type=="BH"){ # this is a simplification assuming that both are either HS or BH
 
     logith<-sapply(opt,FUN=function(x)x$par[1])#0.2+1/(1+exp(-sapply(opt,FUN=function(x)x$par[1])))*0.8
     VC<-lapply(opt,FUN=function(x)solve(x$hessian))

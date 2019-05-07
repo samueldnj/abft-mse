@@ -65,7 +65,14 @@
 \item{B}{currently unused}
 \item{SSB}{a 4D array containing true simulated spawning biomass [MP x nsim x nstocks x nyears]}
 \item{SSB0}{a 2D array containing unfished spawnign biomass by simulation and stock [nsim x nstocks]}
-\item{SSB0proj}{a 3D array containing unfished spawning biomass by simulation, stock and projection year [nsim x nstocks x proyears]}
+\item{dynB0}{a 3D array containing dynamic unfished spawning biomass by simulation, stock and projection year [nsim x nstocks x proyears]}
+\item{MSY}{a 2D array containing MSY estimates (2018 parameters) [sim x nstocks]}
+\item{BMSY}{a 2D array containing BMSY estimates (2018 parameters) [sim x nstocks]}
+\item{VBMSY}{a 2D array containing vulnerable BMSY estimates (2018 parameters) [sim x nstocks]}
+\item{SSBMSY}{a 2D array containing SSBMSY estimates (2018 parameters) [sim x nstocks]}
+\item{UMSY}{a 2D array containing UMSY estimates (2018 parameters) [sim x nstocks]}
+\item{FMSYa}{a 2D array containing apical FMSY estimates (2018 parameters) [sim x nstocks]}
+\item{SSBMSY_SSB0}{a 2D array containing MSY estimates (2018 parameters) [sim x nstocks]}
 \item{TAC}{a 4D array containing the TAC recommendations [nsim x MP x stock x proyear]}
 \item{nMPs}{an integer number representing the number of MPs in the MSE}
 \item{Snames}{a character vector naming the stocks [nstocks]}

@@ -13,15 +13,6 @@ M3write<-function(OMI,OMdir="C:/M3"){
   datfile<-paste0(OMdir,"/M3.dat")
   if(!dir.exists(unlist(strsplit(datfile,split="M3.dat"))))stop("You must specify a valid M3 directory")
 
-  #write("# name",datfile,1,append=F)
-  #write(OMI@Name,datfile,1,append=T)
-
-  #write("# nOMfactors",datfile,1,append=T)
-  #write(length(OMI@OMfactors),datfile,1,append=T)
-
-  #write("# OMfactors",datfile,1,append=T)
-  #write(unlist(OMI@OMfactors),datfile,length(OMI@OMfactors),append=T)
-
   write("# nHy number of historical years for SRA",datfile,1,append=F)
   write(OMI@nHy,datfile,1,append=T)
 
@@ -55,23 +46,11 @@ M3write<-function(OMI,OMdir="C:/M3"){
   write("# sdur the duration of the various subyears (sums to 1)",datfile,1,append=T)
   write(OMI@sdur,datfile,OMI@ns,append=T)
 
-  #write("# nZeq Number of years at the start of the model to calculate equilibrium Z from (mean of nZep years)",datfile,1,append=T)
-  #write(OMI@nZeq,datfile,OMI@ns,append=T)
-
   write("# nydist Number of years over which initial stock distribution is calculated (prior to spool up)",datfile,1,append=T)
   write(OMI@nydist,datfile,OMI@ns,append=T)
 
-  #write("# nyeq Number of spool-up years over which the stock is subject to nZeq, used to define equilibrium conditions",datfile,1,append=T)
-  #write(OMI@nyeq,datfile,OMI@ns,append=T)
-
   write("# ml the mean length of the length categories",datfile,1,append=T)
   write(OMI@mulen,datfile,OMI@nl,append=T)
-
-  write("# RDblock the RD parameter for each year",datfile,1,append=T)
-  write(OMI@RDblock,datfile,OMI@ny,append=T)
-
-  write("# nRD the number of estimated recruitment strengths",datfile,1,append=T)
-  write(OMI@nRD,datfile,1,append=T)
 
   # -- Growth --
 
@@ -95,8 +74,35 @@ M3write<-function(OMI,OMdir="C:/M3"){
   write("# Fec, fecundity at age, SSB at age",datfile,1,append=T)
   write(t(OMI@Fec),datfile,OMI@na,append=T)
 
-  #write("# steep, steepness of the Bev-Holt SR relationship",datfile,1,append=T)
-  #write(OMI@steep,datfile,OMI@np,append=T)
+  write("# nSR, number of stock recruitment relationships",datfile,1,append=T)
+  write(OMI@nSR,datfile,1,append=T)
+
+  write("# SRminyr, starting model year of each SR relationship",datfile,1,append=T)
+  write(OMI@SRminyr,datfile,OMI@nSR,append=T)
+
+  write("# SRmaxyr, ending model year of each SR relationship",datfile,1,append=T)
+  write(OMI@SRmaxyr,datfile,OMI@nSR,append=T)
+
+  nRDyr<-rep(1,4)
+  nRDyr[1:OMI@nSR]<-OMI@SRmaxyr-OMI@SRminyr+1
+
+  write("# nRDs, number of recruitment deviation parameters",datfile,1,append=T)
+  write(OMI@nRDs,datfile,4,append=T)
+
+  write("# RDts, which rec dev time series by population and year",datfile,1,append=T)
+  write(t(OMI@RDts),datfile,OMI@ny,append=T)
+
+  write("# RDno, which rec param of each rec dev matrix",datfile,1,append=T)
+  write(t(OMI@RDno),datfile,OMI@ny,append=T)
+
+  write("# SRp, stock to apply each SR relationship",datfile,1,append=T)
+  write(OMI@SRp,datfile,OMI@nSR,append=T)
+
+  write("# SRpar, stock recruitment parameter to assume for each SR relationship",datfile,1,append=T)
+  write(OMI@SRpar,datfile,OMI@nSR,append=T)
+
+  write("# SSBpR, unfished spawning stock biomass per recruit",datfile,1,append=T)
+  write(OMI@SSBpR,datfile,OMI@np,append=T)
 
   # -- Spawning --
 
@@ -129,6 +135,10 @@ M3write<-function(OMI,OMdir="C:/M3"){
 
   write("# CPUEobs, CPUE observations y s r cpueindex f CPUE(weight)",datfile,1,append=T)
   write(t(OMI@CPUEobs),datfile,ncol(OMI@CPUEobs),append=T)
+
+  write("# CPUEwt, additional weights for each CPUE series",datfile,1,append=T)
+  write(OMI@CPUEwt,datfile,OMI@nCPUEq,append=T)
+
 
   # Partial F's (standardized effort)
 
@@ -169,19 +179,22 @@ M3write<-function(OMI,OMdir="C:/M3"){
   write("# Iobs, fishery independent observations y s r p i type(biomass/ssb) index",datfile,1,append=T)
   write(t(OMI@Iobs),datfile,7,append=T)
 
+  write("# Iwt, additional weights for each fishery independent index",datfile,1,append=T)
+  write(OMI@Iwt, datfile,OMI@nI,append=T)
+
   # PSAT tagging --
 
   write("# nPSAT, PSATs data of known stock of origin p a s t fr tr N",datfile,1,append=T)
   write(OMI@nPSAT,datfile,1,append=T)
 
   write("# PSAT data of known stock of origin p a s t fr tr N",datfile,1,append=T)
-  write(t(OMI@PSAT),datfile,7,append=T)
+  write(t(OMI@PSAT),datfile,8,append=T)
 
   write("# nPSAT2, PSATs data of unknown stock of origin a s t fr tr SOO(npop)",datfile,1,append=T)
   write(t(OMI@nPSAT2),datfile,1,append=T)
 
   write("# PSAT2 data of unknown stock of origin a s t fr tr SOO(npop)",datfile,1,append=T)
-  write(OMI@PSAT2,datfile,5+OMI@np,append=T)
+  write(t(OMI@PSAT2),datfile,8,append=T)
 
   # Placeholder for conventional tags
 
@@ -196,8 +209,8 @@ M3write<-function(OMI,OMdir="C:/M3"){
   write("# nSOOobs, number of stock of origin observations p a y s r N",datfile,1,append=T)
   write(nrow(OMI@SOOobs),datfile,1,append=T)
 
-  write("# SOOobs, stock of origin observations p a y s r N",datfile,1,append=T)
-  write(t(OMI@SOOobs),datfile,6,append=T)
+  write("# SOOobs, stock of origin observations p a y s r N type",datfile,1,append=T)
+  write(t(OMI@SOOobs),datfile,8,append=T)
 
   # -- Selectivity controls
 
@@ -205,7 +218,6 @@ M3write<-function(OMI,OMdir="C:/M3"){
   write(OMI@nsel,datfile,1,append=T) # same as number of fleets
 
   write("# seltype, 2:logistic, 3:Thompson",datfile,1,append=T)
-  #       PS,TP,LL,OTH
   write(OMI@seltype,datfile,OMI@nsel,append=T) # LL fleet is logistic
 
   write("# selind, which selectivity is assigned to each fleet",datfile,1,append=T)
@@ -267,23 +279,23 @@ M3write<-function(OMI,OMdir="C:/M3"){
   write("# RDCV, lognormal penalty on recruitment deviations",datfile,1,append=T)
   write(OMI@RDCV,datfile,1,append=T)
 
+  write("# nSSBprior, prior on current SSB",datfile,1,append=T)
+  write(OMI@nSSBprior,datfile,1,append=T) # Absolute tonnage of SSB in current model year
+
   write("# SSBprior, prior on current SSB",datfile,1,append=T)
-  write(OMI@SSBprior,datfile,1,append=T) # Absolute tonnage of SSB in current model year
+  write(t(OMI@SSBprior),datfile,3,append=T) # Absolute tonnage of SSB in current model year
 
   write("# SSBCV, lognormal penalty SSBprior",datfile,1,append=T)
   write(OMI@SSBCV,datfile,1,append=T) # CV on SSB prior in current model year
 
-  write("# SSBfit, type of ssb fit",datfile,1,append=T)
-  write(OMI@SSBfit,datfile,1,append=T) # CV on SSB prior in current model year
+  write("# nDepprior, prior on current SSB",datfile,1,append=T)
+  write(OMI@nDepprior,datfile,1,append=T) # Absolute tonnage of SSB in current model year
 
-  write("# SSBinc, ratio of SSBy[2]/SSBy[1]",datfile,1,append=T)
-  write(OMI@SSBinc,datfile,1,append=T) # CV on SSB prior in current model year
+  write("# Depprior, prior on current SSB",datfile,1,append=T)
+  write(t(OMI@Depprior),datfile,3,append=T) # Absolute tonnage of SSB in current model year
 
-  write("# SSBy, years for SSBinc ratio calculation",datfile,1,append=T)
-  write(OMI@SSBy,datfile,1,append=T) # CV on SSB prior in current model year
-
-  write("# SSBincstock, stock for SSBinc ratio calculation",datfile,1,append=T)
-  write(OMI@SSBincstock,datfile,1,append=T) # CV on SSB prior in current model year
+  write("# DepCV, lognormal penalty SSBprior",datfile,1,append=T)
+  write(OMI@DepCV,datfile,1,append=T) # CV on SSB prior in current model year
 
   write("# BSfrac, mixing assumptions the proportion of E/W stock biomass in W/E areas",datfile,1,append=T)
   write(t(OMI@BSfrac),datfile,4,append=T) # CV on SSB prior in current model year
@@ -297,11 +309,11 @@ M3write<-function(OMI,OMdir="C:/M3"){
   write("# selCV, prior precision of mean selectivity parameters ",datfile,1,append=T)
   write(OMI@selCV,datfile,1,append=T) # CV on SSB prior in current model year
 
-  write("# SSBincCV, precision of specified prior on SSB ratio (SSBinc, SSBy, SSBincstock)",datfile,1,append=T)
-  write(OMI@SSBincCV,datfile,1,append=T) # CV on SSB prior in current model year
+  write("# R0diffCV, prior precision of mean on log ratio of early and late R0 estimates ",datfile,1,append=T)
+  write(OMI@R0diffCV,datfile,1,append=T) # CV on SSB prior in current model year
 
-  write("# BSfracCV, precision of mixing prior E/W stock biomass in W/E area",datfile,1,append=T)
-  write(OMI@BSfracCV,datfile,1,append=T) # CV on SSB prior in current model year
+  write("# BSfracCV, prior precision of mixing East - West stock in opposite areas ",datfile,1,append=T)
+  write(OMI@BSfracCV,datfile,1,append=T) # CV mixing prior
 
   # -- Likelihood weights
 
@@ -350,12 +362,6 @@ M3write<-function(OMI,OMdir="C:/M3"){
 
   write("# nF either nCobs or 1 if complexF=0",datfile,1,append=T)
   write(OMI@nF,datfile,1,append=T) # debug switch
-
-  #write("# nMPind",datfile,1,append=T)
-  #write(nrow(OMI@MPind),datfile,1,append=T)
-
-  #write("# MPind",datfile,1,append=T)
-  #write(t(OMI@MPind),datfile,7,append=T)
 
   write("# debug 1= run with initial values",datfile,1,append=T)
   write(OMI@debug,datfile,1,append=T) # debug switch
@@ -475,8 +481,6 @@ M3read<-function(OMDir="C:/M3",quiet=T){
   nma<-out$nma
 
   st<-19
-  #out$ma<-ADMBrep(repfile,st,ADMBdim=c(np,na),quiet=quiet)
-  #st<-st+1+np
   out$SSB<-ADMBrep(repfile,st,ADMBdim=c(np,ny,ns),quiet=quiet)
   st<-st+1+np*ny
   out$hSSB<-ADMBrep(repfile,st,ADMBdim=c(np,nHy,ns),quiet=quiet)
@@ -495,6 +499,8 @@ M3read<-function(OMDir="C:/M3",quiet=T){
   st<-st+2
   out$CLobs<-ADMBrep(repfile,st,c(out$nCLobs,6),quiet=quiet)
   st<-st+1+out$nCLobs
+  out$CLprop<-scan(repfile,skip=st,nlines=1,quiet=quiet)
+  st<-st+2
   out$CLtotpred<-ADMBrep(repfile,st,c(ny,ns,nr,nf,nl),quiet=quiet)
   st<-st+1+ny*ns*nr*nf
   out$VL<-ADMBrep(repfile,st,c(ny,ns,nr,nf,nl),quiet=quiet)
@@ -515,6 +521,12 @@ M3read<-function(OMDir="C:/M3",quiet=T){
   st<-st+1+ny*ns
   out$N<-ADMBrep(repfile,st,c(np,ny,ns,na,nr),quiet=quiet)
   st<-st+1+np*ny*ns*na
+  out$SSB_mu<-ADMBrep(repfile,st,c(np,ny),quiet=quiet)
+  st<-st+1+np
+  out$Rec_mu<-ADMBrep(repfile,st,c(np,ny),quiet=quiet)
+  st<-st+1+np
+  out$Rec_wd<-ADMBrep(repfile,st,c(np,ny),quiet=quiet)
+  st<-st+1+np
   out$lwa<-scan(repfile,skip=st,nlines=1,quiet=quiet)
   st<-st+2
   out$lwb<-scan(repfile,skip=st,nlines=1,quiet=quiet)
@@ -539,12 +551,10 @@ M3read<-function(OMDir="C:/M3",quiet=T){
   st<-st+6
   out$M_age<-ADMBrep(repfile,st,c(np,na),quiet=quiet)
   st<-st+1+np
-  #out$h<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-  #st<-st+2
-  out$RDblock<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-  st<-st+2
   fec<-ADMBrep(repfile,st,c(np,na),quiet=quiet)
   out$mat_age<-fec/t(out$wt_age[1,,]) # for some UNEXPLAINED reason this also assigns this to out$ma (pointer?)
+  st<-st+1+np
+  out$h<-ADMBrep(repfile,st,c(np,ny))
   st<-st+1+np
   out$nsel<-scan(repfile,skip=st,nlines=1,quiet=quiet)
   st<-st+2
@@ -564,22 +574,16 @@ M3read<-function(OMDir="C:/M3",quiet=T){
   st<-st+2
   out$hZ<-ADMBrep(repfile,st,c(np,nHy,ns,na,nr))
   st<-st+1+np*nHy*ns*na
-  out$Ipred<-ADMBrep(repfile,st,c(ny,ns,nr,np))
-  st<-st+1+ny*ns*nr
-  #out$nZeq<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-  #st<-st+2
+  #out$Ipred<-ADMBrep(repfile,st,c(ny,ns,nr,np))
+  #st<-st+1+ny*ns*nr
   out$nydist<-scan(repfile,skip=st,nlines=1,quiet=quiet)
   st<-st+2
-  #out$nyeq<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-  #st<-st+2
   out$SSB0<-scan(repfile,skip=st,nlines=1,quiet=quiet)
   st<-st+2
-  out$muR<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-  st<-st+2
-  out$lnHR1<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-  st<-st+2
-  out$lnHR2<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-  st<-st+2
+  out$R0<-ADMBrep(repfile,st,c(np,ny))
+  st<-st+3
+  out$h<-ADMBrep(repfile,st,c(np,ny))
+  st<-st+3
   out$nRD<-scan(repfile,skip=st,nlines=1,quiet=quiet)
   st<-st+2
   out$lnRD<-ADMBrep(repfile,st,c(np,out$nRD))
@@ -592,17 +596,20 @@ M3read<-function(OMDir="C:/M3",quiet=T){
   st<-st+2
   out$SSBnow<-scan(repfile,skip=st,nlines=1,quiet=quiet)
   st<-st+2
-  out$objnam<-c("Model","Global","Catch","CPUE","Ind.","Length","SOO","PSAT","P Rec.","P mov","P sel","SRA pen","P SSB","P Fmod","P ratio")
-  #st<-st+1
+  out$objnam<-c("Catch","CPUE","Ind.","Length","SOO","PSAT","P Rec.","P mov","P sel","SRA pen","P SSB","P Dep","P Fmod","R0 diff","TOT")
   out$obj<-scan(repfile,skip=st,nlines=1,quiet=quiet)
   st<-st+2
+  out$SOOpred<-scan(repfile,skip=st,nlines=1,quiet=quiet)
+  st<-st+2
+  out$CPUEpred_vec<-scan(repfile,skip=st,nlines=1,quiet=quiet)
+  st<-st+2
+  out$Ipred_vec<-scan(repfile,skip=st,nlines=1,quiet=quiet)
+  st<-st+2
+  out$PSATpred<-scan(repfile,skip=st,nlines=1,quiet=quiet)
+  st<-st+2
+  out$PSAT2pred<-scan(repfile,skip=st,nlines=1,quiet=quiet)
+  st<-st+2
   out$datacheck<-scan(repfile,skip=st,nlines=1,quiet=quiet)
-
-  opt<-SRopt(out,plot=F)
-  out$h<-opt$h
-  out$R0<-opt$R0
-  out$logith_lnR0_VC<-opt$VC
-  #out$h_logit<-h_est[,2:3]
   out
 }
 
@@ -792,23 +799,29 @@ make_fit_reports<-function(dirs="C:/M3",addlab=FALSE) {
       stop()
     }
 
+    # input_dir="C:/Users/tcarruth/Dropbox/abft-mse/M3"
     out<-M3read(input_dir)
     load(paste(input_dir,"/OMI",sep=""))
     load(system.file("ts2017.Rdata", package="ABTMSE"))
     dat<-ts2017
-    #getM3res(out,outdir=input_dir,firstyr=1960,fleetnams=c(OMI@Fleets$name,'ALL OTH'),   areanams=OMI@areanams)
-    #plotM3fit(out,outdir=input_dir,firstyr=1960, fleetnams=c(OMI@Fleets$name,'ALL OTH'), areanams=OMI@areanams)
+
     if(!addlab){
-      render(input=system.file("OMreport.Rmd", package="ABTMSE"), output_file=paste(input_dir,"/Report.pdf",sep=""))
+      # render(input="C:/Users/tcar_/Dropbox/abft-mse/R_package/ABTMSE/inst/OMreport.Rmd", output_file=paste(input_dir,"/Report.pdf",sep=""))
+
+      render(input=system.file("OMreport.Rmd", package="ABTMSE"), output_file=paste(input_dir,"/Report.html",sep=""))
       print(paste0("Report written: ", paste(input_dir,"/Report.pdf",sep="")))
+
     }else{
+
       split<-strsplit(input_dir,"/")[[1]]
       lab<-split[length(split)]
-      render(input=system.file("OMreport.Rmd", package="ABTMSE"), output_file=paste(input_dir,"/Report_",lab,".pdf",sep=""))
+      render(input=system.file("OMreport.Rmd", package="ABTMSE"), output_file=paste(input_dir,"/Report_",lab,".html",sep=""))
       print(paste0("Report written: ", paste(input_dir,"/Report_",lab,".pdf",sep="")))
+
     }
 
   }
+
 }
 
 #' Make M3 summary fitting report for all OMs
@@ -845,7 +858,7 @@ make_summary_report<-function(dir,OMdirs=NA){
   }
   nOMs<-length(OMdirs)
   #render(input="Source/OMsummary.Rmd", output_file=paste(dir,"/Summary report.pdf",sep=""))
-  render(input=system.file("OMsummary.Rmd", package="ABTMSE"), output_file=paste(dir,"/Summary_Report.pdf",sep=""))
+  render(input=system.file("OMsummary.Rmd", package="ABTMSE"), output_file=paste(dir,"/Summary_Report.html",sep=""))
 
 }
 

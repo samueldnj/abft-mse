@@ -2,7 +2,7 @@
 % Please edit documentation in R/MPs.R
 \name{CDD_i7}
 \alias{CDD_i7}
-\title{A delay difference model fitted to INDEX 7 (JPN_LL_EAtl_Med) linked to Justin Cooke's harvest control rule (a management procedure of class MP).}
+\title{A delay difference model for index 7 (GOM_LAR_SUV) assuming current depletion is 0.2}
 \usage{
 CDD_i7(x, dset)
 }
@@ -10,14 +10,16 @@ CDD_i7(x, dset)
 \item{x}{a simulation number.}
 
 \item{dset}{a list of simulated data for use by management procedures.}
+
+\item{checkfit}{logical: should fitting diagnostics be plotted}
 }
 \value{
 a TAC recommendation arising from \code{x, dset}.
 }
 \description{
-A delay difference model fitted to INDEX 7 (JPN_LL_EAtl_Med) linked to Justin Cooke's harvest control rule (a management procedure of class MP).
+A delay difference model for index 7 (GOM_LAR_SUV) assuming current depletion is 0.2
 }
 \examples{
-CDD_i7(1,dset_example_West)
-sapply(1:10,CDD_i7,dset_example_West)
+CDD_i7(1,dset_example_East)
+sapply(1:10,CDD_i7,dset_example_East)
 }

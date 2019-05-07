@@ -1,5 +1,6 @@
+
 # ===============================================================================================================
-# === Management Procedures for ABT MSE =========================================================================
+# === Management Procedures for ABT MSE==========================================================================
 # ===============================================================================================================
 
 #' No catches (actually very small catches) (a management procedure of class MP).
@@ -15,6 +16,7 @@ ZeroC <- function(x,dset)mean(dset$Cobs[x,],na.rm=T)*1E-10
 class(ZeroC)<-"MP"
 
 
+
 #' Example Management Procedure 1 west using the GOM_LAR_SUV
 #'
 #' @param x a simulation number.
@@ -28,7 +30,7 @@ EMP1w <- function(x,dset,Jtarg=0.66,TACadj=0.1,thresh=0.4){
 
   ny<-dim(dset$Iobs)[3]                          # Last year of index observations
   cury<-dim(dset$TAC)[2]                         # Last year of past TAC recommendations
-  Jratio<-mean(dset$Iobs[x,7,(-4:0)+ny])/Jtarg  # Index 7 is the GOM_LAR_SUV
+  Jratio<-mean(dset$Iobs[x,7,(-4:0)+ny])/Jtarg   # Index 7 is the GOM_LAR_SUV
 
   if(Jratio>(1-thresh) & Jratio<(1+thresh)){
     rec=dset$TAC[x,cury]
@@ -82,7 +84,7 @@ EMP2w <- function(x,dset,Jtarg=0.66,lup=0.05,ldown=0.15,pup=0.05,pdown=0.15){
 
   ny<-dim(dset$Iobs)[3]
   cury<-dim(dset$TAC)[2]
-  Ind<-dset$Iobs[x,7,(-5:0)+ny]
+  Ind<-dset$Iobs[x,7,(-5:0)+ny] # index 7 is the GOM larval survey
   slp<-lm(y~x,data=data.frame(y=log(Ind),x=1:6))$coefficients[2]
   Jratio<-mean(dset$Iobs[x,7,(-4:0)+ny])/Jtarg  # Index 7 is the GOM_LAR_SUV
   oldTAC<-dset$TAC[x,cury]
@@ -158,7 +160,7 @@ class(EMP2e)<-"MP"
 #' @examples
 #' CurC150(1,dset_example_West)
 #' sapply(1:10,CurC150,dset_example_West)
-CurC150 <- function(x,dset)dset$TAC[x,1]*1.5
+CurC150 <- function(x,dset)dset$curTAC[x]*1.5
 class(CurC150)<-"MP"
 
 
@@ -171,9 +173,8 @@ class(CurC150)<-"MP"
 #' @examples
 #' CurC100(1,dset_example_West)
 #' sapply(1:10,CurC100,dset_example_West)
-CurC100 <- function(x,dset)dset$TAC[x,1]
+CurC100 <- function(x,dset)dset$curTAC[x]
 class(CurC100)<-"MP"
-
 
 
 #' Half current catches (a management procedure of class MP).
@@ -185,8 +186,49 @@ class(CurC100)<-"MP"
 #' @examples
 #' CurC50(1,dset_example_West)
 #' sapply(1:10,CurC50,dset_example_West)
-CurC50 <- function(x,dset)dset$TAC[x,1]*0.5
+CurC50 <- function(x,dset)dset$curTAC[x]*0.5
 class(CurC50)<-"MP"
+
+#' One quarter current catches (a management procedure of class MP).
+#'
+#' @param x a simulation number.
+#' @param dset a list of simulated data for use by management procedures.
+#' @return a TAC recommendation arising from \code{x, dset}.
+#' @export
+#' @examples
+#' CurC25(1,dset_example_West)
+#' sapply(1:10,CurC25,dset_example_West)
+CurC25<-function (x, dset)dset$curTAC[x] * 0.25
+class(CurC25)<-'MP'
+
+
+#' Three quarters current catches (a management procedure of class MP).
+#'
+#' @param x a simulation number.
+#' @param dset a list of simulated data for use by management procedures.
+#' @return a TAC recommendation arising from \code{x, dset}.
+#' @export
+#' @examples
+#' CurC75(1,dset_example_West)
+#' sapply(1:10,CurC75,dset_example_West)
+CurC75<-function (x, dset)  dset$curTAC[x] * 0.75
+class(CurC75)<-'MP'
+
+
+#' Current catches x 1.25 (a management procedure of class MP).
+#'
+#' @param x a simulation number.
+#' @param dset a list of simulated data for use by management procedures.
+#' @return a TAC recommendation arising from \code{x, dset}.
+#' @export
+#' @examples
+#' CurC125(1,dset_example_West)
+#' sapply(1:10,CurC125,dset_example_West)
+CurC125<-function (x, dset) dset$curTAC[x] * 1.25
+class(CurC125)<-'MP'
+
+
+
 
 
 #' Fish at MSY harvest rate with imperfect information regarding UMSY and current biomass (a management procedure of class MP).
@@ -223,8 +265,9 @@ class(UMSY_PI)<-"MP"
 #' @examples
 #' DD_i7(1,dset_example_West)
 #' sapply(1:10,DD_i7,dset_example_West)
-DD_i7<-function(x,dset,checkfit=F) DD(x,dset,startD=1,ii=7,checkfit=checkfit)
-class(DD_i7) <- "MP"
+DD_i7<-function(x,dset,checkfit=F) DD(x,dset,startD=0.5,ii=7,checkfit=checkfit)
+class(DD_i7)<-"MP"
+
 
 
 #' A rapid 3 parameter observation error only delay difference model linked to 40-10 harvest control rule FOR INDEX 7 (GOM_LAR_SUV) conditioned on effort and parameterized with UMSY and MSY leading (a management procedure of class MP).
@@ -237,7 +280,7 @@ class(DD_i7) <- "MP"
 #' @examples
 #' DD_i7_4010(1,dset_example_East)
 #' sapply(1:10,DD_i7_4010,dset_example_East)
-DD_i7_4010<-function(x,dset,checkfit=F) DD(x,dset,startD=1,ii=7,checkfit=checkfit,fortyten=T)
+DD_i7_4010<-function(x,dset,checkfit=F) DD(x,dset,startD=0.5,ii=7,checkfit=checkfit,fortyten=T)
 class(DD_i7_4010)<-"MP"
 
 
@@ -264,7 +307,8 @@ DD<-function(x,dset,startD,ii,checkfit,fortyten=F){
   C_hist<-dset$Cobs[x,]
 
   E_hist<-C_hist/I_hist
-  E_hist<-E_hist/mean(E_hist)
+  E_hist<-E_hist/mean(E_hist,na.rm=T)
+  E_hist[is.na(E_hist)]<-E_hist[(1:length(E_hist))[match(TRUE,!is.na(E_hist))]]
   ny_DD<-length(C_hist)
   params<-log(c(Mc/2,mean(C_hist,na.rm=T)/2,Mc/2))
   k_DD<-ceiling(a50V)   # get age nearest to 50% vulnerability (ascending limb)  -------------
@@ -308,7 +352,16 @@ DD<-function(x,dset,startD,ii,checkfit,fortyten=F){
 
 
 
-x<-2
+#' A delay difference model for index 7 (GOM_LAR_SUV) assuming current depletion is 0.2
+#'
+#' @param x a simulation number.
+#' @param dset a list of simulated data for use by management procedures.
+#' @param checkfit logical: should fitting diagnostics be plotted
+#' @return a TAC recommendation arising from \code{x, dset}.
+#' @export
+#' @examples
+#' CDD_i7(1,dset_example_East)
+#' sapply(1:10,CDD_i7,dset_example_East)
 CDD_i7<-function(x,dset)CDD(x,dset,ii=7)
 class(CDD_i7)<-"MP"
 
@@ -442,6 +495,15 @@ DD_R<-function(params,opty,So_DD,Alpha_DD,Rho_DD,ny_DD,k_DD,wa_DD,E_hist,C_hist,
   }
 }
 
+#' Extended Survival Analysis MP (currently in development)
+#'
+#' @param x a simulation number.
+#' @param dset a list of simulated data for use by management procedures.
+#' @return a TAC recommendation arising from \code{x, dset}.
+#' @export
+#' @examples
+#' XSA(1,dset_example_East)
+#' sapply(1:10,XSA,dset_example_East)
 XSA<-function(x,dset){
   #for(x in 1:8){
   maxage<-dset$nages
@@ -532,7 +594,7 @@ XSA<-function(x,dset){
   #print(c(Bnow,dset$Bt_PI[x]))
   #}
 }
-class(XSA)<-"MP"
+#class(XSA)<-"MP"
 
 # internal function for XSA
 getrefs<-function(xsa,Stk,Wta,maxage,nyears){
@@ -839,7 +901,7 @@ Fadapt<-function(x,dset,yrsmth=7,gg=1,FMSY_M=0.5,ii){
 }
 
 
-#' One of two Southern Bluefin Tuna management procedures that uses recruitment trajectory to adjust TAC (a management procedure of class MP).
+#' A Southern Bluefin Tuna management procedure that uses recruitment trajectory to adjust TAC (a management procedure of class MP).
 #'
 #' @param x a simulation number.
 #' @param dset a list of simulated data for use by management procedures.

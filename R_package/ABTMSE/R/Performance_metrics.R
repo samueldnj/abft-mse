@@ -3,6 +3,43 @@
 # ======================================================================================================================
 
 
+# === Average catches over all years =======================
+
+#' Mean  catches over first 30 projected years (a performance metrics function of class PM)
+#'
+#' @param MSE An object of class MSE
+#' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
+#' @examples
+#' loadABT()
+#' AvC30(MSE_example)
+AvC30<-function(MSE,pp=1) apply(MSE@C[,,pp,MSE@nyears+1:30],1:2,mean,na.rm=T)
+class(AvC30)<-"PM"
+
+# === Average catches over all years =======================
+
+#' Relative depletion (spawning biomass relative to dynamic B0) after 30 years (a performance metrics function of class PM)
+#'
+#' @param MSE An object of class MSE
+#' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
+#' @examples
+#' loadABT()
+#' RD30(MSE_example)
+RD30<-function(MSE,pp=1) MSE@SSB[,,pp,MSE@nyears+30]/MSE@SSB[,,pp,MSE@nyears]
+class(RD30)<-"PM"
+
+
+#' Relative depletion (spawning biomass relative to dynamic B0) after 15 years (a performance metrics function of class PM)
+#'
+#' @param MSE An object of class MSE
+#' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
+#' @examples
+#' loadABT()
+#' RD15(MSE_example)
+RD15<-function(MSE,pp=1) MSE@SSB[,,pp,MSE@nyears+15]/MSE@SSB[,,pp,MSE@nyears]
+class(RD15)<-"PM"
+
+
+
 # === (a) Annual average catch ============================================
 
 #' Mean  catches over the first 10 projected years (a performance metrics function of class PM)
@@ -12,7 +49,7 @@
 #' @examples
 #' loadABT()
 #' C10(MSE_example)
-C10<-function(MSE,pp=1) apply(MSE@C[,,pp,MSE@nyears+1:10],1:2,mean)
+C10<-function(MSE,pp=1) apply(MSE@C[,,pp,MSE@nyears+1:10],1:2,mean,na.rm=T)
 class(C10)<-"PM"
 
 #' Mean catches over projected years 11-20 (a performance metrics function of class PM)
@@ -22,7 +59,7 @@ class(C10)<-"PM"
 #' @examples
 #' loadABT()
 #' C20(MSE_example)
-C20<-function(MSE,pp=1) apply(MSE@C[,,pp,MSE@nyears+11:20],1:2,mean)
+C20<-function(MSE,pp=1) apply(MSE@C[,,pp,MSE@nyears+11:20],1:2,mean,na.rm=T)
 class(C20)<-"PM"
 
 #' Mean catches over projected years 21-30 (a performance metrics function of class PM)
@@ -32,13 +69,13 @@ class(C20)<-"PM"
 #' @examples
 #' loadABT()
 #' C30(MSE_example)
-C30<-function(MSE,pp=1) apply(MSE@C[,,pp,MSE@nyears+21:30],1:2,mean)
+C30<-function(MSE,pp=1) apply(MSE@C[,,pp,MSE@nyears+21:30],1:2,mean,na.rm=T)
 class(C30)<-"PM"
 
 
 # === (b) Spawning biomass depletion (means) ==================================
 
-#' Depletion (SSB relative to unfished SSB given current recruitment dynamics) for the first 10 projected years (a performance metrics function of class PM)
+#' Depletion (spawning biomass relative to dynamic B0) after the first 10 projected years (a performance metrics function of class PM)
 #'
 #' @param MSE An object of class MSE
 #' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
@@ -46,12 +83,12 @@ class(C30)<-"PM"
 #' loadABT()
 #' D10(MSE_example)
 D10<-function(MSE,pp=1){
-  D<-MSE@SSB[,,pp,MSE@nyears+1:10]/array(rep(MSE@SSB0proj[,pp,1:10],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim,10))
-  apply(D,1:2,mean)
+  MSE@SSB[,,pp,MSE@nyears+10]/array(rep(MSE@dynB0[,pp,10],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim))
+  #apply(D,1:2,mean)
 }
 class(D10)<-"PM"
 
-#' Depletion (SSB relative to unfished SSB given current recruitment dynamics) for projected years 11-20 (a performance metrics function of class PM)
+#' Depletion (spawning biomass relative to dynamic B0) after projection year 20 (a performance metrics function of class PM)
 #'
 #' @param MSE An object of class MSE
 #' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
@@ -59,12 +96,12 @@ class(D10)<-"PM"
 #' loadABT()
 #' D20(MSE_example)
 D20<-function(MSE,pp=1){
-  D<-MSE@SSB[,,pp,MSE@nyears+11:20]/array(rep(MSE@SSB0proj[,pp,11:20],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim,10))
-  apply(D,1:2,mean)
+  MSE@SSB[,,pp,MSE@nyears+20]/array(rep(MSE@dynB0[,pp,20],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim))
+  #apply(D,1:2,mean)
 }
 class(D20)<-"PM"
 
-#' Depletion (SSB relative to unfished SSB given current recruitment dynamics) for projected years 21-30 (a performance metrics function of class PM)
+#' Depletion (spawning biomass relative to dynamic B0) after projection yeare 30 (a performance metrics function of class PM)
 #'
 #' @param MSE An object of class MSE
 #' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
@@ -72,15 +109,24 @@ class(D20)<-"PM"
 #' loadABT()
 #' D30(MSE_example)
 D30<-function(MSE,pp=1){
-  D<-MSE@SSB[,,pp,MSE@nyears+21:30]/array(rep(MSE@SSB0proj[,pp,21:30],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim,10))
-  apply(D,1:2,mean)
+  MSE@SSB[,,pp,MSE@nyears+30]/array(rep(MSE@dynB0[,pp,30],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim))
 }
 class(D30)<-"PM"
 
+#' Depletion (spawning biomass relative to dynamic BMSY) after projection yeare 30 (a performance metrics function of class PM)
+#'
+#' @param MSE An object of class MSE
+#' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
+#' @examples
+#' loadABT()
+#' Br30(MSE_example)
+Br30<-function(MSE,pp=1){
+  MSE@SSB[,,pp,MSE@nyears+30]/array(rep(MSE@dynB0[,pp,30]*MSE@SSBMSY_SSB0[,pp],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim))
+}
+class(Br30)<-"PM"
 
-# === (c) Lowest depletion =================================================
 
-#' Depletion (SSB relative to unfished SSB given current recruitment dynamics) all projected years (a performance metrics function of class PM)
+#' Depletion (spawning biomass relative to dynamic B0) all projected years (a performance metrics function of class PM)
 #'
 #' @param MSE An object of class MSE
 #' @return a matrix with n Management procedures (MSE@nMP) and nsim (MSE@nsim) columns from \code{MSE}
@@ -88,7 +134,7 @@ class(D30)<-"PM"
 #' loadABT()
 #' LD(MSE_example)
 LD<-function(MSE,pp=1){
-  D<-MSE@SSB[,,pp,MSE@nyears+1:MSE@proyears]/array(rep(MSE@SSB0proj[,pp,1:MSE@proyears],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim,MSE@proyears))
+  D<-MSE@SSB[,,pp,MSE@nyears+1:MSE@proyears]/array(rep(MSE@dynB0[,pp,1:MSE@proyears],each=MSE@nMPs),c(MSE@nMPs,MSE@nsim,MSE@proyears))
   apply(D,1:2,min)
 }
 class(LD)<-"PM"
@@ -129,7 +175,7 @@ class(LDNC)<-"PM"
 #' @examples
 #' loadABT()
 #' PGK(MSE_example)
-PGK<-function(MSE,pp=1) apply(MSE@F_FMSY[,,pp,MSE@nyears+1:30]<1 & MSE@B_BMSY[,,pp,MSE@nyears+1:30]>1,1:2,mean)*100
+PGK<-function(MSE,pp=1) apply(MSE@F_FMSY[,,pp,MSE@nyears+1:30]<1 & MSE@B_BMSY[,,pp,MSE@nyears+1:30]>1,1:2,mean,na.rm=T)*100
 class(PGK)<-"PM"
 
 #' Probability of Over-Fishing (F>FMSY) over 30 projected years (a performance metrics function of class PM)
@@ -139,7 +185,7 @@ class(PGK)<-"PM"
 #' @examples
 #' loadABT()
 #' POF(MSE_example)
-POF<-function(MSE,pp=1) apply(MSE@F_FMSY[,,pp,MSE@nyears+1:30]>1,1:2,mean)*100
+POF<-function(MSE,pp=1) apply(MSE@F_FMSY[,,pp,MSE@nyears+1:30]>1,1:2,mean,na.rm=T)*100
 class(POF)<-"PM"
 
 #' Probability of Over-Fished status (B<BMSY) after 30 projected years (a performance metrics function of class PM)
@@ -149,7 +195,7 @@ class(POF)<-"PM"
 #' @examples
 #' loadABT()
 #' POS(MSE_example)
-POS<-function(MSE,pp=1) apply(MSE@B_BMSY[,,pp,MSE@nyears+1:30]<1,1:2,mean)/MSE@proyears*100
+POS<-function(MSE,pp=1) apply(MSE@B_BMSY[,,pp,MSE@nyears+1:30]>1,1:2,mean,na.rm=T)*100
 class(POS)<-"PM"
 
 
@@ -163,10 +209,15 @@ class(POS)<-"PM"
 #' loadABT()
 #' AAVC(MSE_example)
 AAVC<-function(MSE,pp=1){
-  ind1<-MSE@nyears+1:MSE@proyears-1
-  ind<-MSE@nyears+1:MSE@proyears
+  ind<-MSE@nyears+(((1:floor(MSE@proyears/3))*3)-2)
+  ind1<-ind[1:(length(ind)-1)]
+  ind<-ind[2:length(ind)]
   C<-MSE@C[,,pp,]
   C[C==0]<-tiny
-  apply(((C[,,ind]-C[,,ind1])^2)^0.5/C[,,ind1],1:2,mean,na.rm=T)*100
+
+  apply(abs(C[,,ind]-C[,,ind1])/C[,,ind1],1:2,quantile,p=0.5,na.rm=T)*100
 }
 class(AAVC)<-"PM"
+
+
+

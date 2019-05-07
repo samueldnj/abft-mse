@@ -4,7 +4,10 @@
 
 # These functions represent modifications to a Base OMI (operating model input) object.
 
-Mat_Ref<-function(OMI,lev=NA){
+
+# Factor 1 Recruitment scenario
+
+Rec_Ref<-function(OMI,lev=NA){
 
   if(is.na(lev)){
 
@@ -12,46 +15,142 @@ Mat_Ref<-function(OMI,lev=NA){
 
   }else if(lev=='Names'){
 
-    return(c("W-LSpn_E-LSpn","W-LSpn_E-HSpn","W-HSpn_E-LSpn","W-HSpn_E-HSpn"))
+    return(c("W: h=0.6, HS E: h=0.98, 0.98","W: h=0.6 E: HS", "W: h=0.6, HS E: h=0.98, 0.98"))
 
   }else if(lev=='LongNames'){
 
-    return(c("Level 1: West - younger spawning, East - younger spawning",
-             "Level 2: West - younger spawning, East - older spawning",
-             "Level 3: West - older spawning, East - younger spawning",
-             "Level 4: West - older spawning, East - older spawning"))
+    return(c("Level 1: West BH h=0.6 to HS in 1975, East BH h=0.98 R0 before/after 1988",
+             "Level 2: West BH h=0.6, East HS",
+             "Level 3: As level 1 but changes after 10 years. West to BH, East to pre 1988 R0"))
 
   }else{
 
-    matlow<- c(0, 0, 0.25, 0.5, rep(1,OMI@na-4)) # both stocks
-    mathighW<-c(0, 0, 0, 0, 0, 0.01, 0.04, 0.19, 0.56, 0.88, 0.98, 1, rep(1,OMI@na-12)) #both stocks
-    mathighE<-c(0, 0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, rep(1,OMI@na-8)) #both stocks
 
-    if(lev==1){      # East,  West
-      tmat<-array(c(matlow,matlow),c(OMI@na,OMI@np))
-      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
-      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
-    }else if(lev==2){# East,  West
-      tmat<-array(c(mathighE,matlow),c(OMI@na,OMI@np))
-      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
-      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
-    }else if(lev==3){ # East,  West
-      tmat<-array(c(matlow,mathighW),c(OMI@na,OMI@np))
-      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
-      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
-    }else{
-      tmat<-array(c(mathighE,mathighW),c(OMI@na,OMI@np))
-      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
-      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
+    if(lev==1|lev==3){# East,  West
+      OMI@nSR=4
+      OMI@SRpar<-c(0.98,0.98,0.6,0.9)
+      OMI@SRp<-c(1,1,2,2)
+      OMI@SRtype<-c("BH","BH","BH","BH")
+      OMI@SRminyr<-c(1,24,1,11)
+      OMI@SRmaxyr<-c(23,52,10,52)
+
+      OMI@nRDs<-rep(1,4)
+
+      RDts<-array(4,c(OMI@np,OMI@ny))
+      RDno<-array(1,c(OMI@np,OMI@ny))
+      yblock<-2 # the duration of recruitment deviation blocks
+      for(rd in 1:OMI@nSR){
+        RDts[OMI@SRp[rd],OMI@SRminyr[rd]:OMI@SRmaxyr[rd]]=rd
+        tempvec<-rep(1:100,each=yblock)[1:(OMI@SRmaxyr[rd]-OMI@SRminyr[rd]+1)]
+        RDno[OMI@SRp[rd],OMI@SRminyr[rd]:OMI@SRmaxyr[rd]]=tempvec
+        OMI@nRDs[rd]<-max(tempvec)
+
+      }
+      OMI@RDno=RDno
+      OMI@RDts=RDts
+
+    }else if(lev==2){      # East,  West
+
+      OMI@nSR=2
+      OMI@SRpar<-c(0.98,0.6)
+      OMI@SRp<-c(1,2)
+      OMI@SRtype<-c("HS","BH")
+      OMI@SRminyr<-c(1,1)
+      OMI@SRmaxyr<-c(52,52)
+      OMI@nRDs<-rep(1,4)
+
+      RDts<-array(4,c(OMI@np,OMI@ny))
+      RDno<-array(1,c(OMI@np,OMI@ny))
+      yblock<-2 # the duration of recruitment deviation blocks
+      for(rd in 1:OMI@nSR){
+        RDts[OMI@SRp[rd],OMI@SRminyr[rd]:OMI@SRmaxyr[rd]]=rd
+        tempvec<-rep(1:100,each=yblock)[1:(OMI@SRmaxyr[rd]-OMI@SRminyr[rd]+1)]
+        RDno[OMI@SRp[rd],OMI@SRminyr[rd]:OMI@SRmaxyr[rd]]=tempvec
+        OMI@nRDs[rd]<-max(tempvec)
+
+      }
+      OMI@RDno=RDno
+      OMI@RDts=RDts
+
     }
 
     return(OMI)
 
   }
+
+}
+
+# Factor 2 Abundance fitting -----------------------------------
+
+SSB_Dep_Ref<-function(OMI,lev=NA){
+
+  load(system.file("ts2017.Rdata", package="ABTMSE"))
+  dat<-ts2017
+
+  if(is.na(lev)){
+
+    return(3)
+
+  }else if(lev=='Names'){
+
+    return(c("Best estimate","As 2017 assessments", "Matches perception of heavy depletion"))
+
+  }else if(lev=='LongNames'){
+
+    return(c("Level 1: Best estimates of the M3 model",
+             "Level 2: Strong priors on east-west area SSB from 2017 assessments",
+             "Level 3: Prior on depletion to match perception of heavy exploitation"))
+
+  }else{
+
+    if(lev==1){# East,  West
+
+      OMI@nSSBprior=1
+      OMI@SSBprior<-matrix(c(1,1,20000),nrow=1)
+      OMI@SSBCV<-10
+      OMI@nDepprior=1
+      OMI@Depprior<-matrix(c(1,1,0.5),nrow=1)
+      OMI@DepCV<-10
+      OMI@LHw[12:13]<-0
+      #OMI@LHw[14]<-25 # the Fmod prior
+
+    }else if(lev==2){      # East,  West
+
+      tempdat<-dat[dat$assessment=="VPA",c(1,3,4)]
+      tempdat[,1]<-match(tempdat[,1],c("East","West"))
+      tempdat[,2]<-tempdat[,2]-OMI@years[1]+1
+
+      OMI@nSSBprior=nrow(tempdat)
+      OMI@SSBprior<-as.matrix(tempdat)
+      OMI@SSBCV<-0.1
+      OMI@nDepprior=1
+      OMI@Depprior<-matrix(c(1,1,0.5),nrow=1)
+      OMI@DepCV<-10
+      OMI@LHw[12:13]<-c(0.5,0)
+      #OMI@LHw[14]<-5 # 2 x base - the Fmod prior
+
+    } else{
+
+      OMI@nSSBprior=1
+      OMI@SSBprior<-matrix(c(1,1,20000),nrow=1)
+      OMI@SSBCV<-10
+      OMI@nDepprior=20
+      OMI@Depprior<-cbind(rep(1:2,each=10),rep(41:50,2),rep(0.25,20))
+      OMI@DepCV<-0.05
+      OMI@LHw[12:13]<-c(0,0.05)
+      OMI@LHw[14]<-5 # 5 x base - the Fmod prior
+    }
+
+    return(OMI)
+
+  }
+
 }
 
 
-# Natural mortality rate / M --------------------------
+
+
+# Factor 3 Natural mortality rate / M --------------------------
 
 MatM_Ref<-function(OMI,lev=NA){
 
@@ -265,4 +364,52 @@ Dep_Ref<-function(OMI,lev=NA){
 
   }
 
+}
+
+
+
+Mat_Ref<-function(OMI,lev=NA){
+
+  if(is.na(lev)){
+
+    return(3)
+
+  }else if(lev=='Names'){
+
+    return(c("W-LSpn_E-LSpn","W-LSpn_E-HSpn","W-HSpn_E-LSpn","W-HSpn_E-HSpn"))
+
+  }else if(lev=='LongNames'){
+
+    return(c("Level 1: West - younger spawning, East - younger spawning",
+             "Level 2: West - younger spawning, East - older spawning",
+             "Level 3: West - older spawning, East - younger spawning",
+             "Level 4: West - older spawning, East - older spawning"))
+
+  }else{
+
+    matlow<- c(0, 0, 0.25, 0.5, rep(1,OMI@na-4)) # both stocks
+    mathighW<-c(0, 0, 0, 0, 0, 0.01, 0.04, 0.19, 0.56, 0.88, 0.98, 1, rep(1,OMI@na-12)) #both stocks
+    mathighE<-c(0, 0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, rep(1,OMI@na-8)) #both stocks
+
+    if(lev==1){      # East,  West
+      tmat<-array(c(matlow,matlow),c(OMI@na,OMI@np))
+      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
+      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
+    }else if(lev==2){# East,  West
+      tmat<-array(c(mathighE,matlow),c(OMI@na,OMI@np))
+      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
+      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
+    }else if(lev==3){ # East,  West
+      tmat<-array(c(matlow,mathighW),c(OMI@na,OMI@np))
+      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
+      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
+    }else{
+      tmat<-array(c(mathighE,mathighW),c(OMI@na,OMI@np))
+      OMI@mat<-array(t(tmat),c(OMI@np,OMI@na,OMI@ny))
+      OMI@Fec<-OMI@wt_age[,,1]*OMI@mat[,,1]
+    }
+
+    return(OMI)
+
+  }
 }

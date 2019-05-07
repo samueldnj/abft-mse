@@ -34,7 +34,7 @@ AssignFleet<-function(dat,Fleets){
     if(Fleets$flag[i]=="ALL"){
       condf<-rep(TRUE,nrow(dat))
     }else{
-      condf<- Fleets$flag[i]==dat$FleetCode
+      condf<- grepl(Fleets$flag[i],dat$FleetCode) # unique(dat$FleetCode[condf])
     }
 
     condy<-dat$Year>(Fleets$FyS[i]-1) & dat$Year<(Fleets$FyE[i]+1)
@@ -125,9 +125,12 @@ assign_quarter<-function(dat){
 
 assign_fleet<-function(dat,fleets){
 
-  Fleet<-match(dat$GearGrpCode,fleets)
-  if(!"GearGrpCode"%in%names(dat)&"GearGrp"%in%names(dat))Fleet<-match(dat$GearGrp,fleets)
-  Fleet[is.na(Fleet)]<-length(fleets)+1
+  if("GearGrpCode"%in%names(dat)){
+    Fleet<-match(dat$GearGrpCode,fleets)
+  }else if("GearGrp"%in%names(dat)){
+    Fleet<-match(dat$GearGrp,fleets)
+  }
+  Fleet[is.na(Fleet)]<-length(fleets$gearTC)+1
   cbind(dat,Fleet)
 
 }

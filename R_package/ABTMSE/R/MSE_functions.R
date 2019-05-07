@@ -1,6 +1,10 @@
 #' Calculate performance metrics.
 #'
 #' @param MSE an object of class MSE
+#' @param rnd number of significant digits to round tabulated values
+#' @param outdir a directory for the table
+#' @param quantiles a vector 2 long of upper and lower quantiles to calculate and include in the table if quantile=T
+#' @param quantile logical: should quantiles be calculated and included in the table
 #' @return a list n stocks long each with a data frame of performance metrics (columns) by management procedure (row) \code{MSE}.
 #' \itemize{
 #'   \item Y10. Mean yield over the first 10 years of the projection
@@ -8,21 +12,22 @@
 #'   \item Y30. Mean yield over years 21-30 of the projection
 #'   \item PGK. Probability of Green Kobe (F<FMSY AND B>BMSY) region over all years of the projection
 #'   \item POF. Probability of Over-Fishing (F>FMSY) over all years of the projection
-#'   \item POFed. Probability of Over-Fished status (B<BMSY) over all years of the projection
-#'   \item D10. Mean depletion (SSB relative to unfished) over the first 10 years of the projection
-#'   \item D20. Mean depletion (SSB relative to unfished) over years 11-20 of the projection
-#'   \item D30. Mean depletion (SSB relative to unfished) over years 21-30 of the projection
-#'   \item LD. Mean depletion (SSB relative to unfished) over all projected years
-#'   \item RSSB. Mean Spawning Stock Biomass in final projection year relative to zero fishing
-#'   \item LRSSB. Mean Spawning Stock Biomass over all projection years relative to zero fishing
+#'   \item POS. Probability of Over-Fished status (B<BMSY) over all years of the projection
+#'   \item D10. Mean depletion (SSB relative to unfished) after 10 years of the projection
+#'   \item D20. Mean depletion (SSB relative to unfished) after 20 years of the projection
+#'   \item D30. Mean depletion (SSB relative to unfished) after 30 years of the projection
+#'   \item LD. Mean spawning stock depletion over all projected years
+#'   \item DNC Spawning stock Depletion in final projection year relative to zero fishing
+#'   \item LDNC. Lowest Spawning Stock depletion over all projection years relative to zero fishing
 #'   \item AAVY. Mean Average Annual Variability in Yield over all projections
-#'   \item carat. weight of the diamond (0.2--5.01)
 #'   ...
 #' }
 #' @examples
 #' getperf(MSE_example)
-getperf<-function(MSE,rnd=3,outdir=NA){
+getperf<-function(MSE,rnd=3,outdir=NA,quantiles=c(0.05,0.95),quantile=F){
 
+  p<-0.5
+  if(quantile)p<-c(quantiles[1],p,quantiles[2])
   nsim<-MSE@nsim
   proyears<-MSE@proyears
   nMPs<-MSE@nMPs
@@ -33,6 +38,8 @@ getperf<-function(MSE,rnd=3,outdir=NA){
   out<-new('list')
 
   for(pp in 1:MSE@npop){
+
+    AvC30a<-AvC30(MSE,pp=pp)/1E6
 
     C10a<-C10(MSE,pp=pp)/1E6 # thousand tonnes
     C20a<-C20(MSE,pp=pp)/1E6
@@ -52,24 +59,59 @@ getperf<-function(MSE,rnd=3,outdir=NA){
 
     AAVCa<-AAVC(MSE,pp)
 
-    out[[pp]]<-data.frame("C10"=apply(C10a,1,mean),
-                          "C20"=apply(C20a,1,mean),
-                          "C30"=apply(C30a,1,mean),
+    Br30a<-Br30(MSE,pp)
 
-                          "D10"=apply(D10a,1,mean),
-                          "D20"=apply(D20a,1,mean),
-                          "D30"=apply(D30a,1,mean),
+    if(!quantile){
+    out[[pp]]<-data.frame("AvC30"=apply(AvC30a,1,quantile,p),
 
-                          "LD"=apply(LDa,1,mean),
-                          "DNC"=apply(DNCa,1,mean),
-                          "LDNC"=apply(LDNCa,1,mean),
+                          "C10"=apply(C10a,1,quantile,p),
+                          "C20"=apply(C20a,1,quantile,p),
+                          "C30"=apply(C30a,1,quantile,p),
 
-                          "POF"=apply(POFa,1,mean),
-                          "POS"=apply(POSa,1,mean),
-                          "PGK"=apply(PGKa,1,mean),
+                          "D10"=apply(D10a,1,quantile,p),
+                          "D20"=apply(D20a,1,quantile,p),
+                          "D30"=apply(D30a,1,quantile,p),
 
-                          "AAVC"=apply(AAVCa,1,mean),
+                          "LD"=apply(LDa,1,quantile,p),
+                          "DNC"=apply(DNCa,1,quantile,p),
+                          "LDNC"=apply(LDNCa,1,quantile,p),
+
+                          "POF"=apply(POFa,1,quantile,p),
+                          "POS"=apply(POSa,1,quantile,p),
+                          "PGK"=apply(PGKa,1,quantile,p),
+
+                          "AAVC"=apply(AAVCa,1,quantile,p),
+                          "Br30"=apply(Br30a,1,quantile,p),
                           row.names=MPnams)
+    }else{
+      ptext<-c(p[1]*100,"Med",p[3]*100)
+      metrics<-c("AvC30","C10","C20","C30","D10","D20","D30","LD","DNC","LDNC","POF","POS","PGK","AAVC","Br30")
+      pnams<-paste(rep(metrics,each=3),rep(ptext,length(metrics)),sep="_")
+     dat<-cbind(t(apply(AvC30a,1,quantile,p)),
+           t(apply(C10a,1,quantile,p)),
+             t(apply(C20a,1,quantile,p)),
+               t(apply(C30a,1,quantile,p)),
+
+                 t(apply(D10a,1,quantile,p)),
+                   t(apply(D20a,1,quantile,p)),
+                     t(apply(D30a,1,quantile,p)),
+
+                       t(apply(LDa,1,quantile,p)),
+                         t(apply(DNCa,1,quantile,p)),
+                           t(apply(LDNCa,1,quantile,p)),
+
+                             t(apply(POFa,1,quantile,p)),
+                               t(apply(POSa,1,quantile,p)),
+                                 t(apply(PGKa,1,quantile,p)),
+
+                           t(apply(AAVCa,1,quantile,p)),
+                              t(apply(Br30a,1,quantile,p)))
+
+     out[[pp]]<-as.data.frame(dat,row.names=MPnams,names=pnams)
+     names(out[[pp]])<-pnams
+
+
+    }
     out[[pp]]<-round(out[[pp]],rnd)
 
     if(!is.na(outdir))if(file.exists(outdir))write.csv(out[[pp]],paste0(outdir,"/",MSE@Snames[pp],"_perf.csv"))
@@ -292,7 +334,7 @@ custombar<-function(dat,MPnams,tickwd1=0.05,tickwd2=0.025,lwd1=2,lwd2=1,xlab=T){
 #' @return a plot showing performance metric statistics accross MPs
 #' @examples
 #' PPlot()
-PPlot<-function(MSE,Pnames=c("C10","C30","D30","LD","DNC","LDNC","PGK","AAVC")){
+PPlot<-function(MSE,Pnames=c("AvC30","C10","C30","D30","LD","DNC","LDNC","PGK","AAVC","Br30")){
 
   nsim<-MSE@nsim
   nMPs<-MSE@nMPs
@@ -332,5 +374,60 @@ PPlot<-function(MSE,Pnames=c("C10","C30","D30","LD","DNC","LDNC","PGK","AAVC")){
   mtext("Candidate Management Procedure",1,line=6.8,font=2,outer=T)
 
 }
+
+#' Run a set of MSE runs
+#'
+#' @param OMdir A vector of operating model directories (e.g. those found in abft-mse/Objects/OMs/)
+#' @param MPs A vector of management procedures for analysis
+#' @param nsim The number of simulations
+#' @param OMdir Obs an observation error model of class 'Obs' e.g. Perfect_Obs
+#' @param rebuildOMs Logical: should the OMs be rebuilt or should those in the directory be used directly
+runAll<-function(OMdirs,MPs,Obs,outfolder){
+  load(paste0(OMdirs[x],"/OM"))
+  MSEobj<-new('MSE',OM=OM,MPs=MPs,Obs=Obs)
+  save(MSEobj,file=paste0(outfolder,"/MSE_multi_",OMcode,".Rda"))
+}
+
+runMulti<-function(x,OMdirs,MPs,nsim,Obs,rebuildOMs,outfolder,seed){
+
+  if(rebuildOMs){
+    OMcode<-strsplit(OMdirs[x],split="//")[[1]][2]
+    OM<-new('OM',OMdirs[x],nsim=nsim)
+  }else{
+    load(paste0(OMdirs[x],"/OM"))
+  }
+  OM@seed<-seed
+  if(OMcode=="R1"){
+    MSEobj<-new('MSE',OM=OM,MPs=MPs,Obs=Obs,IE=Overage_20)
+  }else{
+    MSEobj<-new('MSE',OM=OM,MPs=MPs,Obs=Obs)
+  }
+  save(MSEobj,file=paste0(outfolder,"/MSE_multi_",OMcode,".Rda"))
+
+}
+
+#' Run whole MSE runs in parallel
+#'
+#' @param OMdir A vector of operating model directories (e.g. those found in abft-mse/Objects/OMs/)
+#' @param MPs A vector of management procedures for analysis
+#' @param nsim The number of simulations
+#' @param Obs an observation error model of class 'Obs' e.g. Perfect_Obs
+#' @param rebuildOMs Logical: should the OMs be rebuilt or should those in the directory be used directly
+#' @param outfolder the folder where output MSE objects should be placed
+#' @param seed the random seed for the MSE
+multiMSE<-function(OMdirs,MPs=MPs,nsim=12, Obs=Perfect_Obs, rebuildOMs=T,outfolder,seed=1){
+
+  sfExport('Obs')
+  sfLibrary(ABTMSE)
+  if(!sfIsRunning())stop("You need to start a cluster with sfInit before running this")
+
+  sfSapply(1:length(OMdirs),runMulti,OMdirs=OMdirs,
+           MPs=MPs,nsim=nsim,Obs=Obs,rebuildOMs=rebuildOMs,
+           outfolder=outfolder,seed=seed)
+  #sapply(1:length(OMdirs),runMulti,OMdirs=OMdirs, MPs=MPs,nsim=nsim,Obs=Obs,rebuildOMs=rebuildOMs,outfolder=outfolder,seed=seed)
+  message("multiMSE run complete")
+
+}
+
 
 

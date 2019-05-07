@@ -20,11 +20,14 @@
 \item{b}{A vector nsim long of Length-weight conversion parameter b W=aL^b}
 \item{nages}{An integer value specifying the total number of age classes}
 \item{ageM}{A vector nsim long of estimates of age at 50 per cent maturity}
-\item{M}{A matrix of maturity at age [sim x age]}
+\item{Mat}{A matrix of maturity at age [sim x age]}
 \item{Bt_PI}{A vector nsim long of current biomass estimates known perfectly (PI: Perfect Information)}
 \item{UMSY_PI}{A vector nsim long of UMSY nown perfectly (PI: Perfect Information)}
 \item{CAA}{A 3D array of catch at age observations [sim x age x year]}
 \item{CAL}{A vector of lengths representing the start-end points of the length bins corresponding to CAL data]}
+\item{CAL_bins}{The intervals for the length binning of the CAL data}
+\item{TAC}{A matrix nsim rows by n TAC updates that stores all previous TACs that have been set}
+\item{TAC}{A vector nsim long of the current (2018) TAC recommendation}
 \item{MPrec}{A vector nsim long of the previous recommendations of the management procedure}
 }
 }

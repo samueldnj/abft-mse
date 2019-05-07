@@ -60,7 +60,14 @@
 #' \item{B}{currently unused}
 #' \item{SSB}{a 4D array containing true simulated spawning biomass [MP x nsim x nstocks x nyears]}
 #' \item{SSB0}{a 2D array containing unfished spawnign biomass by simulation and stock [nsim x nstocks]}
-#' \item{SSB0proj}{a 3D array containing unfished spawning biomass by simulation, stock and projection year [nsim x nstocks x proyears]}
+#' \item{dynB0}{a 3D array containing dynamic unfished spawning biomass by simulation, stock and projection year [nsim x nstocks x proyears]}
+#' \item{MSY}{a 2D array containing MSY estimates (2018 parameters) [sim x nstocks]}
+#' \item{BMSY}{a 2D array containing BMSY estimates (2018 parameters) [sim x nstocks]}
+#' \item{VBMSY}{a 2D array containing vulnerable BMSY estimates (2018 parameters) [sim x nstocks]}
+#' \item{SSBMSY}{a 2D array containing SSBMSY estimates (2018 parameters) [sim x nstocks]}
+#' \item{UMSY}{a 2D array containing UMSY estimates (2018 parameters) [sim x nstocks]}
+#' \item{FMSYa}{a 2D array containing apical FMSY estimates (2018 parameters) [sim x nstocks]}
+#' \item{SSBMSY_SSB0}{a 2D array containing MSY estimates (2018 parameters) [sim x nstocks]}
 #' \item{TAC}{a 4D array containing the TAC recommendations [nsim x MP x stock x proyear]}
 #' \item{nMPs}{an integer number representing the number of MPs in the MSE}
 #' \item{Snames}{a character vector naming the stocks [nstocks]}
@@ -106,9 +113,19 @@ setClass("MSE",representation(
   F_FMSY="array",
   B="array",
   SSB="array",
+  SSBa="array",
   SSB0="array",
-  SSB0proj="array",
+  dynB0="array",
   TAC="array",
+
+  # operating model MSY quantities
+  MSY="array",
+  BMSY="array",
+  VBMSY="array",
+  SSBMSY="array",
+  UMSY="array",
+  FMSYa="array",
+  SSBMSY_SSB0="array",
 
   nMPs="integer",
   Snames="character",
@@ -120,8 +137,9 @@ setClass("MSE",representation(
 
 ))
 
-setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=list(c("UMSY","UMSY")),interval=3,IE="Umax_90",
-                                        curTAC=c(13500000,2000000),Allocation=NA,MPareas=NA,Fdistyrs=3){
+setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=list(c("UMSY","UMSY")),interval=2,IE="Umax_90",
+                                        TAC2015=c(16142000,2000000),TAC2016=c(19296000,1912000),TAC2017=c(23155000,2000000),TAC2018=c(28200000,2350000),TAC2019=c(28200000,2350000),
+                                        Allocation=ABTMSE:::Allocation,MPareas=NA,Fdistyrs=3,maxTAC=c(10,10),MSEparallel=F){
   #.Object})
   #.Object<-new('MSE')
 
@@ -137,7 +155,7 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
     print(paste('Could not run MSE:',deparse(substitute(Obs)),'not of class Obs'))
     stop()
   }
-  if(class(get(MPs[[1]][1]))!='MP'){
+  if(class(get(MPs[[1]][1]))!='MP'& class(get(MPs[[1]][1]))!='MSMP'){
     print(paste('Could not run MSE:',deparse(substitute(MPs[[1]][1])),'not of class MP'))
     stop()
   }
@@ -151,6 +169,15 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   # copy over dimensions ------
   dimslots<-slotNames(OM)[1:18]
   for(i in 1:18)slot(.Object,dimslots[i])<-slot(OM,dimslots[i])
+
+  # All MSY operating model quantities
+  .Object@MSY<-OM@MSY
+  .Object@BMSY<-OM@BMSY
+  .Object@VBMSY<-OM@VBMSY
+  .Object@SSBMSY<-OM@SSBMSY
+  .Object@UMSY<-OM@UMSY
+  .Object@FMSYa<-OM@FMSYa
+  .Object@SSBMSY_SSB0<-OM@SSBMSY_SSB0
 
   cat("Constructing arrays")
   cat("\n")
@@ -177,6 +204,7 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   #R0<-OM@Recpars[,,1,2]
   mat<-OM@mat
   mov<-OM@mov
+  movIndex<-OM@movIndex
   h<-OM@h
   Recsubyr<-OM@Recsubyr
   Recdevs<-OM@Recdevs
@@ -190,21 +218,22 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   surv=tomt(exp(-apply(Mtemp[,,,1],2:1,cumsum)))
   surv[,,nages]<-surv[,,nages]*exp(-Mtemp[,,nages,1])/(1-exp(-Mtemp[,,nages,1]))
 
+  rm(Mtemp); invisible(gc())
+
   N<-SSB<-Z<-array(NA,c(nsim,npop,nages,allyears,nsubyears,nareas)) # only need aggregated catch for these purposes
   FD<-array(NA,c(nsim,nfleets,nyears,nsubyears,nareas))              # Fishing distribution
   Fdist<-array(NA,c(nsim,npop,nfleets,nareas))
-  VB<-C<-array(NA,c(nsim,npop,nages,allyears,nsubyears,nareas,nfleets))
+  C<-array(NA,c(nsim,npop,nages,allyears,nsubyears,nareas,nfleets)) # VB removed
   CA<-array(NA,c(nsim,npop,allyears,nsubyears,nareas))
 
   hFAT<-array(NA,c(nsim,nHyears,nsubyears,nages,nareas))
   hZ<-array(NA,c(nsim,npop,nages,nHyears,nsubyears,nareas))
-  hZind<-TEG(dim(hZ))
-  hFATind<-hZind[,c(1,3,4,5,6)]
+  #hZind<-TEG(dim(hZ))
+  #hFATind<-hZind[,c(1,3,4,5,6)]
 
   mref<-c(2:nsubyears,1)  # movement reference
   y<-1
   m<-1
-
 
   # Calculating F arrays ----------------------------------------------
   cat("Calculating historical fishing mortality rate at length (computationally intensive)")
@@ -215,30 +244,55 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   #RFL[indL]<-OM@qE[indL[,c(1,2)]]*OM@sel[indL[,1:3]]*OM@E[indL[,c(1,2,4,5,6)]]
   iALK<-OM@iALK
 
+
+  FML<-array(NA,c(nsim,npop,nlen,allyears,nsubyears,nareas,nfleets))
+  FM<-array(NA,c(nsim,npop,nages,allyears,nsubyears,nareas,nfleets))
+  Ftemp<-array(NA,c(nsubyears,nfleets,nareas,nages,nlen))
+  Ftind<-TEG(dim(Ftemp))
+  nFt<-nrow(Ftind)
+
+  for(y in 1:nyears){
+
+    FLind<-as.matrix(expand.grid(1:nsim,1:npop,1:nlen,y,1:nsubyears,1:nareas,1:nfleets))
+    FML[FLind]<-OM@qE[FLind[,c(1,7)]]*OM@sel[FLind[,c(1,7,3)]]*OM@E[FLind[,c(1,7,4,5,6)]]*OM@Fmod[FLind[,c(1,6,5)]]
+    rm(FLind); invisible(gc()) # delete F index
+
+    for(s in 1:nsim){
+      for(p in 1:npop){
+
+        FMLind<-cbind(rep(s,nFt),rep(p,nFt),Ftind[,5],rep(y,nFt),Ftind[,c(1,3,2)]) # s p l m r f
+        iALKind<-cbind(rep(s,nFt),rep(p,nFt),rep(y,nFt),Ftind[,4:5]) # s p y a l
+        Ftemp[Ftind]<-FML[FMLind]*iALK[iALKind]
+        FM[s,p,,y,,,]<-aperm(apply(Ftemp,1:4,sum),c(4,1,3,2)) #[m f r a]  to [a m r f]
+
+      }
+    }
+
+  }
+
+
   aseltemp<-array(NA,c(nsim,npop,nfleets,nages,nlen))
   aselind<-TEG(dim(aseltemp))
   iALKs<-OM@iALK[,,1,,] # time invariant
   aseltemp[aselind]<-OM@sel[aselind[,c(1,3,5)]]*iALKs[aselind[,c(1,2,4,5)]]
   asel<-apply(aseltemp,1:4,sum)
+  asel<-asel/array(apply(asel,1:3,max),dim(asel))
 
-  rm(aselind)
+  rm(aselind); invisible(gc())
 
-  FM<-array(NA,c(nsim,npop,nages,allyears,nsubyears,nareas,nfleets))
-  Find<-as.matrix(expand.grid(1:nsim,1:npop,1:nages,1:nyears,1:nsubyears,1:nareas,1:nfleets))
-  FM[Find]<-OM@qE[Find[,c(1,7)]]*asel[Find[,c(1,2,7,3)]]*OM@E[Find[,c(1,7,4,5,6)]]
+ # for(y in 1:nyears){
+  #  Find<-as.matrix(expand.grid(1:nsim,1:npop,1:nages,y,1:nsubyears,1:nareas,1:nfleets))
+   # FM[Find]<-OM@qE[Find[,c(1,7)]]*asel[Find[,c(1,2,7,3)]]*OM@E[Find[,c(1,7,4,5,6)]]
+    #rm(Find); invisible(gc()) # delete F index
+  #}
 
-  rm(Find) # delete F index
-
-  apply(FM[1,1,,nyears,3,,],1:2,sum)
-
-  maxRF<-apply(FM,c(1,2,4,5,6,7),max)
-  Rind<-TEG(c(nsim,npop,nages,nyears,nsubyears,nareas,nfleets))
-  sel<-FM
-  sel[Rind]<-sel[Rind]/maxRF[Rind[,c(1,2,4,5,6,7)]]
-  sel<-sel[,,,nyears,nsubyears,,] # Take this from last year, in future simulations this may be by year so leave this code!
+  maxRF<-apply(FM[,,,nyears,nsubyears,,],c(1,2,4,5),max)
+  Rind<-TEG(c(nsim,npop,nages,nareas,nfleets))
+  sel<-FM[,,,nyears,nsubyears,,]
+  sel[Rind]<-sel[Rind]/maxRF[Rind[,c(1,2,4,5)]]
   sel[is.na(sel)]<-0
 
-  rm(Rind)
+  rm(Rind); invisible(gc())
 
   # Initializing the simulation ----------------------------------------------
   cat("Initializing simulations")
@@ -266,11 +320,10 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   procmu <- -0.5*(proccv)^2
   Pe<-array(exp(rnorm(nsim*npop*LTyrs,procmu,proccv)),c(nsim,npop,LTyrs))
   OM@Recdevs[,,nyears+(-(LTyrs-1):0)]<-Pe # lower triangle are predicted as mean historical recruitment
-  Rec<-array(array(OM@muR,c(nsim,npop,nyears))*OM@Recdevs,c(nsim,npop,nyears))
-  Rec1<-Rec[,,1]
+  Rec<-array(NA,c(nsim,npop,nyears))  #array(OM@muR,c(nsim,npop,nyears))*OM@Recdevs
 
   stemp<-array(1/nareas,dim=c(nsim,npop,nsubyears,nareas))
-  movi<-mov[,,nages,,,]
+  movi<-mov[,,nages,1,,,]
 
   for(y in 1:nydist){
 
@@ -290,22 +343,17 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
 
   }
 
-
   indN<-as.matrix(expand.grid(1:nsim,1:npop,1:nages,1,1:nsubyears,1:nareas))
-  N[indN]=OM@muR[indN[,1:2]]*exp(OM@lnHR1[indN[,1:2]])*surv[indN[,1:3]]*stemp[indN[,c(1,2,5,6)]]
-  #N[,,nages,1,,]<-N[,,nages,1,,]+N[,,nages,1,,]*array(exp(-M[,,nages,1])/(1-exp(-M[,,nages,1])),c(nsim,npop,nsubyears,nareas)) # plus group
-
+  R0ind<-cbind(indN[,1:2],rep(1,nrow(indN)))
+  N[indN]=OM@hR0[R0ind]*surv[indN[,1:3]]*stemp[indN[,c(1,2,5,6)]]
   SSB[,,,1,,]<-N[,,,1,,]*rep(Wt_age[,,,1],nareas*nsubyears)*rep(mat[,,,1],nareas*nsubyears)
 
-  #SSB[sim,pp,age,y,m,rr]
-
-  #apply(SSB[1,    ,   ,1,,],c(1,3),sum)
   sdur<-1/nsubyears
-  canspawn<-array(rep(c(0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0),each=nsim),c(nsim,npop,nareas))
+  canspawn<-array(rep(c(0,1,0,1,0,0,0,0,0,0,0,0,1,0),each=nsim),c(nsim,npop,nareas))
   hM<-array(M,c(nsim,npop,nages,nareas))
 
   for(y in 2:nHyears){
-
+    mi<-movIndex[1]
     for(m in 1:nsubyears){
 
       if(m==1){ # first subyear
@@ -320,7 +368,7 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
         hMind<-hZind[,c(1,2,3,6)]
         hZ[hZind]<-hFAT[hFATind]+hM[hMind]*sdur
         N[,,,1,m,]<-N[,,,1,nsubyears,]*exp(-hZ[,,,y-1,nsubyears,])
-        N[,,,1,m,]<-domov(N[,,,1,m,],mov[,,,m,,])
+        N[,,,1,m,]<-domov(N[,,,1,m,],mov[,,,mi,m,,])
         SSB[,,,1,m,]<-N[,,,1,m,]*rep(Wt_age[,,,1],nareas)*rep(mat[,,,1],nareas)
 
       }else if(m==2){ # spawning subyear
@@ -335,21 +383,22 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
         hMind<-hZind[,c(1,2,3,6)]
         hZ[hZind]<-hFAT[hFATind]+hM[hMind]*sdur
         N[,,,1,m,]<-N[,,,1,m-1,]*exp(-hZ[,,,y,m-1,])
-        N[,,,1,m,]<-domov(N[,,,1,m,],mov[,,,m,,])
+        N[,,,1,m,]<-domov(N[,,,1,m,],mov[,,,mi,m,,])
         SSB[,,,1,m,]<-N[,,,1,m,]*rep(Wt_age[,,,1],nareas)*rep(mat[,,,1],nareas)
 
-        SSBtemp<-apply(SSB[,,,1,m,],c(1,2,4),sum)*canspawn # viable spawning biomass
+        SSBtemp<-apply(SSB[,,,1,m,],c(1,2,4),sum)#*canspawn # viable spawning biomass
         spawnr<-SSBtemp/array(apply(SSBtemp,1:2,sum),dim(SSBtemp))
         SSBt<-apply(SSB[,,,1,m,],1:2,sum)
         N[,,nages,1,m,]<-N[,,nages,1,m,]+N[,,nages-1,1,m,] # plus group
         N[,,2:(nages-1),1,m,]<-N[,,1:(nages-2),1,m,]
         #N[,,1,1,m,]<-spawnr*array(Rec1,dim(spawnr)) # Initial recruitment distributed by viable spawning biomass
 
-        if(y<(nHyears-10)){
-          N[,,1,1,m,]<-spawnr*array(OM@muR[indN[,1:2]]*exp(OM@lnHR1[indN[,1:2]]),dim(spawnr))
-        }else{
-          N[,,1,1,m,]<-spawnr*array(OM@muR[indN[,1:2]]*exp(OM@lnHR2[indN[,1:2]]),dim(spawnr))
-        }
+        #if(y<(nHyears-10)){
+          N[,,1,1,m,]<-spawnr*array(OM@hR0[R0ind],dim(spawnr))
+        #}else{
+
+          # N[,,1,1,m,]<-spawnr*array(OM@muR[indN[,1:2]]*exp(OM@lnHR2[indN[,1:2]]),dim(spawnr))
+        #}
 
 
       }else{   # after spawning subyear
@@ -364,12 +413,14 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
         hMind<-hZind[,c(1,2,3,6)]
         hZ[hZind]<-hFAT[hFATind]+hM[hMind]*sdur
         N[,,,1,m,]<-N[,,,1,m-1,]*exp(-hZ[,,,y,m-1,])
-        N[,,,1,m,]<-domov(N[,,,1,m,],mov[,,,m,,])
+        N[,,,1,m,]<-domov(N[,,,1,m,],mov[,,,mi,m,,])
         SSB[,,,1,m,]<-N[,,,1,m,]*rep(Wt_age[,,,1],nareas)*rep(mat[,,,1],nareas)
 
       }# End of if subyear
     }  # end of subyear
   }    # end of SRA year
+
+  rm(hFAT); rm(hZ); rm(hFATind); rm(hZind); invisible(gc())
 
   # Run historical simulation ----------------------------------------------
   cat("Running historical simulations")
@@ -398,10 +449,10 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
 
     SPAYMRF2[,5]<-m
     SPAYMR2<-SPAYMRF2[,1:6]
-    SPAYMR[,5]<-m
-    VB[SPAYMRF2]<-N[SPAYMR2]*Wt_age[SPAY2]*sel[SPARF2]                    # Calculate vunerable biomassp a y m r f
+    #SPAYMR[,5]<-m
+    #VB[SPAYMRF2]<-N[SPAYMR2]*Wt_age[SPAY2]*sel[SPARF2]                    # Calculate vunerable biomassp a y m r f
     Ftot<-apply(FM[,,,y,m,,],1:4,sum)
-    Z[SPAYMR]<-Ftot[SPAR]+M[SPAY]/nsubyears
+    Z[SPAYMR2]<-Ftot[SPAR]+M[SPAY]/nsubyears
 
     C[SPAYMRF2]<-N[SPAYMR2]*(1-exp(-Z[SPAYMR2]))*(FM[SPAYMRF2]/Z[SPAYMR2]) # Calculate catches
 
@@ -436,10 +487,10 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
       }
 
       # move fish
+      mi<-movIndex[y]
+      N[,,,y,m,]<-domov(N[,,,y,m,],mov[,,,mi,m,,])
 
-      N[,,,y,m,]<-domov(N[,,,y,m,],mov[,,,m,,])
-
-      VB[SPAYMRF2]<-N[SPAYMR2]*Wt_age[SPAY2]*sel[SPARF2]                     # Calculate vunerable biomass
+      #VB[SPAYMRF2]<-N[SPAYMR2]*Wt_age[SPAY2]*sel[SPARF2]                     # Calculate vunerable biomass
       Ftot<-apply(FM[,,,y,m,,],1:4,sum)
       Z[SPAYMR]<-Ftot[SPAR]+M[SPAY]/nsubyears
 
@@ -451,21 +502,42 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
 
         if(Recsubyr[pp]==m){
 
-          SSBtemp<-apply(SSB[,pp,,y,m,],c(1,3),sum)*canspawn[,pp,] # viable spawning biomass
+          SSBtemp<-apply(SSB[,pp,,y,m,],c(1,3),sum)#*canspawn[,pp,] # viable spawning biomass
           spawnr<-SSBtemp/array(apply(SSBtemp,1,sum),dim(SSBtemp))
           N[,pp,nages,y,m,]<-N[,pp,nages,y,m,]+N[,pp,nages-1,y,m,] # plus group
           N[,pp,2:(nages-1),y,m,]<-N[,pp,1:(nages-2),y,m,]
-          N[,pp,1,y,m,]<-spawnr*array(Rec[,pp,y],dim(spawnr)) # Initial recruitment distributed by viable spawning biomass
+
+          SSBpR=apply(surv[,pp,]*Wt_age[,pp,,y]*mat[,pp,,y],1,sum)  # SSBpR both this and SSB0 are now dynamic
+          SSB0=OM@hR0[,pp,y]*SSBpR    #// Unfished Spawning Stock Biomass
+          R0=OM@hR0[,pp,y]
+          SSBt<-apply(SSBtemp,1,sum)
+
+          if(OM@hRectype[pp,y]=="BH"){
+
+              h<-OM@hRecpar[,pp,y]
+              N[,pp,1,y,m,]<-OM@Recdevs[,pp,y]*spawnr*(    (0.8*R0*h*SSBt) / (0.2*SSBpR*R0*(1-h) + (h-0.2)*SSBt))
+
+          }else{ # hockey stick
+
+              inflect<-OM@hRecpar[,pp,y]
+              N[,pp,1,y,m,]<-spawnr*OM@Recdevs[,pp,y]*R0
+              cond<-SSBt<(SSB0*inflect)
+              N[cond,pp,1,y,m,]<-N[cond,pp,1,y,m,]*SSBt[cond]/(SSB0[cond]*inflect[cond])
+          }
+
+          #N[,pp,1,y,m,]<-spawnr*array(Rec[,pp,y],dim(spawnr)) # Initial recruitment distributed by viable spawning biomass
 
         } # if its the right subyear
       } # end of pop
     } # end of subyear
   } # end of year
 
+  #par(mfrow=c(2,1),mar=rep(0.2,4)); matplot(t(apply(N[,1,,,1,],c(1,3),sum)),type='l'); matplot(t(apply(N[,2,,,1,],c(1,3),sum)),type='l')
   #apply(SSB[1,    ,   ,nyears,,],c(1,3),sum)
 
-  SSB0=OM@muR[1,]*exp(OM@lnHR1[1,])*apply(surv[1,,]*Wt_age[1,,,1]*mat[1,,,1],1,sum);     #// Unfished Spawning Stock Biomass
-  #SSB0<-SSB0+OM@muR[1,]*exp(OM@lnHR1[1,])*surv[1,,nages]*Wt_age[1,,nages,1]*mat[1,,nages,1]*exp(-M[1,,nages,1])/(1-exp(-M[1,,nages,1])) #// indefinite integral of surv added to get plus group SSB0
+  SSB0=array(OM@hR0[,,1],dim(surv))*apply(surv*Wt_age[,,,1]*mat[,,,1],1,sum)     #// Unfished Spawning Stock Biomass
+
+  # SSB0<-SSB0+OM@muR[1,]*exp(OM@lnHR1[1,])*surv[1,,nages]*Wt_age[1,,nages,1]*mat[1,,nages,1]*exp(-M[1,,nages,1])/(1-exp(-M[1,,nages,1])) #// indefinite integral of surv added to get plus group SSB0
 
   SSBcur<-apply(N[,,,nyears,nsubyears,]*
                   array(Wt_age[,,,nyears]*OM@mat[,,,nyears],c(nsim,npop,nages,nareas)),1:2,sum)
@@ -518,13 +590,15 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   .Object@D<-array(NA,c(nMPs,nsim,npop,allyears))
   .Object@ageMb<-trlnorm(nsim,1,Obs@ageMbcv)
   .Object@SSB<-array(NA,c(nMPs,nsim,npop,allyears))
+  .Object@SSBa<-array(NA,c(nMPs,nsim,npop,allyears))
   # Run projections ------------------------------------------------
   cat("Running projections")
   cat("\n")
   if(sfIsRunning())sfExport(list=c("XSA","DD_i7","Islope1",
                   "DD_i7_4010","CDD_i7","SPslope","DD",
                   "DD_R","UMSY","CDD","Fadapt","MeanC","tiny"),  namespace="ABTMSE")
-  upyrs<-nyears+(0:(floor(OM@proyears/interval)-1))*interval  # the years in which there are updates (every three years)
+  upyrs<-(nyears+4)+(0:(floor((OM@proyears-2)/interval)-1))*interval  # the years in which there are updates (every three years)
+
 
   testC<-array(NA,c(nsim,npop,nfleets,nareas))
   CAdist<-array(NA,c(nsim,npop,nareas,nfleets,nages))
@@ -534,22 +608,23 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   CAL_bins<-c(OM@mulen,OM@mulen[OM@nlen]+inc)-0.5*inc
 
   # Allocation / assessment vector -------------------------
-  if(is.na(MPareas[1]))MPareas<-c(rep(2,4),rep(1,nareas-4))
+  if(is.na(MPareas[1]))MPareas<-c(rep(2,3),rep(1,nareas-3))
   nAss<-max(MPareas)
 
-  if(is.na(Allocation)[1]){
-    Allocation<-array(0,c(nAss,nfleets))
-    Cdist<-apply(OM@Cobs[(nyears-2):nyears,,,],3:4,sum)
-    for(a in 1:nAss)Allocation[a,]<-apply(Cdist[MPareas==a,],2,sum)/sum(Cdist[MPareas==a,])
-  }
+ # if(is.na(Allocation)[1]){
+  #  Allocation<-array(0,c(nAss,nfleets))
+   # Cdist<-apply(OM@Cobs[(nyears-2):nyears,,,],3:4,sum)
+    #for(a in 1:nAss)Allocation[a,]<-apply(Cdist[MPareas==a,],2,sum)/sum(Cdist[MPareas==a,])
+  #}
 
-  if(ncol(Allocation)!=nfleets)stop("You need to specify an allocation array with  (OM@nfleets) columns")
-  if(length(MPareas)!=nareas)stop("You need to specify an MPareas array with  (OM@nareas) columns")
+  #if(ncol(Allocation)!=nfleets)stop("You need to specify an allocation array with  (OM@nfleets) columns")
+  #if(length(MPareas)!=nareas)stop("You need to specify an MPareas array with  (OM@nareas) columns")
 
   Assess_data<-array(rep(MPareas,each=nAss)==rep(1:nAss,nareas),c(nAss,nareas)) # logical array for later calculations
-  .Object@TAC<-array(NA,c(nsim,nMPs,nAss,proyears+2))
 
   # MP index properties -------------------------------------
+
+  PerfInfo<-max(Obs@Icv)<0.02 # should observation error be added?
 
   nind<-max(Obs@MPind$No)
   Index_areas<-array(FALSE,c(nind,nareas))
@@ -560,63 +635,76 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
   Ilev[,1:nyears,,2]<-apply(SSB[,,,1:nyears,,],c(1,4,6),sum)
   Isim<-array(NA,c(nsim,nind,nyears+proyears,2))
   lastI<-array(NA,c(nsim,nind))
+  lastobs<-rep(NA,nind)
 
   for(i in 1:nind){
 
-    id<-subset(Obs@MPind,Obs@MPind$No==i & Obs@MPind$Year<(OM@nyears+1))
+    id<-subset(Obs@MPind,Obs@MPind$No==i & Obs@MPind$Year<(OM@nyears+2)) # use up to 2016 indices
     yrs<-yrs2<-id$Year
     if(!nyears%in%yrs)yrs2<-c(yrs,nyears)
     Itype[i]<-id$Type[1]  # Biomass (1) or spawning biomass (2)
     aind<-as.numeric(strsplit(as.character(id$Areas[1]),"-")[[1]])
     Index_areas[i,aind]<-TRUE
+    lastobs[i]<-max(yrs)
 
     for(s in 1:nsim){
 
       IB<-Ilev[s,yrs,Index_areas[i,],Itype[i]]
-      if(class(IB)=="matrix")IB<-apply(IB,1,sum)
+      if(class(IB)=="matrix")IB<-apply(IB,1,sum,na.rm=T)
 
       IB2<-Ilev[s,yrs2,Index_areas[i,],Itype[i]]
-      if(class(IB2)=="matrix")IB2<-apply(IB2,1,sum)
+      if(class(IB2)=="matrix")IB2<-apply(IB2,1,sum,na.rm=T)
 
       Isim[s,i,yrs,1]<-id$Index # these also have to include the latest model year nyears yrs2
       lastI[s,i]<-mean(Isim[s,i,yrs[length(yrs)],1]) # I = qB, I/B = q scales OM quantities to indices
 
-      fitout<-indfit(SSB=IB,ind=id$Index,Year=yrs,sim=F,plot=F)
+      modyrs<-yrs[yrs<=nyears]
+      Index_ind<-yrs%in%modyrs
+      fitout<-indfit(SSBt=IB[Index_ind],ind=id$Index[Index_ind],Year=modyrs,sim=F,plot=F)
 
       Istats[s,i,]<-as.numeric(fitout[[1]])
-      Isim[s,i,yrs,2]<-fitout$mult
+      Isim[s,i,modyrs,2]<-fitout$mult
+      if(PerfInfo)  Istats[s,i,c(3,6)]<-0
+
       procmu <- -0.5*(Istats[s,i,3])^2 # adjusted log normal mean
 
-      Perr<-rnorm(proyears+1,procmu, Istats[s,i,3])
-      Perr<-Istats[s,i,2]*Perr+Perr*(1-Istats[s,i,2]*Istats[s,i,2])^0.5#2#AC*Perr[,y-1]+(1-AC)*Perr[,y] # apply a pseudo AR1 autocorrelation to rec devs (log space)
-      Isim[s,i,nyears:(proyears+nyears),2] <-exp(Perr*Istats[s,i,3]/sd(Perr)) # normal
-      #Isim[s,i,nyears,1]<-sum(Ilev[s,nyears,Index_areas[i,],Itype[i]])
+      futureind<-nyears+1:proyears
+      if(PerfInfo){
+        Isim[s,i,futureind,2]<-1
+      }else{
+        Ierr<-rnorm(proyears,procmu, Istats[s,i,6])
+        Ierr<-Istats[s,i,5]*Ierr+Ierr*(1-Istats[s,i,5]*Istats[s,i,5])^0.5# # apply a pseudo AR1 autocorrelation
+        #Isim[s,i,nyears:(proyears+nyears),2] <-exp(Ierr*Istats[s,i,3]/sd(Ierr)) # normal
+        Isim[s,i,futureind,2]<-exp(Ierr*Istats[s,i,6]/sd(Ierr)) # normalize so that post autocorrelation has same sd as before
+      }
+
     }
 
   }
 
+  #  1   2  3   4   5   6
+  # beta AC sd cor AC2 sd2
   .Object@Istats<-Istats
-
-  #Itemp<-Isim[,,1:nyears,1]#^array(Istats[,,1],c(nsim,nind,nyears))                 # add hyperstability / hyper depletion
-  #Itemp2<-Itemp[,,1:nyears]/array(apply(Itemp[,,1:nyears],1:2,mean,na.rm=T),dim(Itemp))#*Isim[,,1:nyears,2] # normalize to mean 1 pre autocorrelated residuals
+  unique(Obs@MPind$Name)
   Iobs<-Isim[,,1:nyears,1]#Itemp1/array(apply(Itemp2,1:2,mean,na.rm=T),dim(Itemp2))                # normalize to mean 1 post residual error
   # !! CHECK !! These historical indices should be identical among simulations (they are the backward recreation of the statistical fits)
 
-  Fdist<-apply(FM[,,,(nyears-Fdistyrs+1):nyears,,,],c(1,5,6,7),sum) # F is the same for both stocks so summing makes no difference
-  Fdistsum<-apply(Fdist,c(1,4),sum)
+  Fdist1<-apply(FM[,,,(nyears-Fdistyrs+1):nyears,,,],c(1,5,6,7),sum)# s m r f  # F is the same for both stocks so summing makes no difference
+  Fdist<-array(0,c(nsim,nsubyears,nareas,nfleets))
+  Fdistsum<-apply(Fdist1,c(1,3:4),sum)#array(NA,c(nsim,nareas,nfleets))
   Fdistind<-TEG(dim(Fdist))
-  Fdist[Fdistind]<-Fdist[Fdistind]/Fdistsum[Fdistind[,c(1,4)]]
-  Fdist[is.na(Fdist)]<-0   # gets rid of zero divided by zero NaN values
+  Fdist[Fdistind]<-Fdist1[Fdistind]/Fdistsum[Fdistind[,c(1,3:4)]]
+  Fdist[is.na(Fdist)]<-0   # apply(Fdist,c(1,3,4),sum)# gets rid of zero divided by zero NaN values
 
-  testC<-array(NA,c(nsim,nsubyears,nareas,nfleets,nAss))
+  testC<- TACdist<-array(NA,c(nsim,nsubyears,nareas,nfleets,nAss))
   testCind<-TEG(dim(testC))
 
-  #include check for Fdist and Allocation
+  TACdist[testCind]<-Fdist[testCind[,1:4]]*Allocation[testCind[,c(3,4)]]*Assess_data[testCind[,c(5,3)]]
 
-  Regime<-OM@Recind[,y-nyears]
-  Rectype<-OM@Rectype[Regime,pp] # rec changes at the same time for both stocks
+  #Regime<-OM@Recind[,y-nyears]
+  #Rectype<-OM@Rectype[Regime,pp] # rec changes at the same time for both stocks
   proccv<-rep(OM@Reccv,allyears)
-  proccv[proccv>0.8]<-0.8 # max proc error ### for testing purposes
+  proccv[proccv>0.6]<-0.6 # max proc error ### for testing purposes
   procmu <- -0.5*(proccv)^2
   Pe<-array(exp(rnorm(nsim*npop*allyears,procmu,proccv)),c(nsim,npop,allyears))
 
@@ -626,8 +714,12 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
 
   # Preallocated arrays
   Itemp<-array(NA,c(nsim,nind,allyears,nareas))
-  .Object@TAC[,,,1]<-rep(curTAC,each=nsim*nMPs)
-
+  .Object@TAC<-array(NA,c(nsim,nMPs,nAss,proyears+2))
+  .Object@TAC[,,,1]<-rep(TAC2016,each=nsim*nMPs)
+  .Object@TAC[,,,2]<-rep(TAC2017,each=nsim*nMPs)
+  .Object@TAC[,,,3]<-rep(TAC2018,each=nsim*nMPs)
+  .Object@TAC[,,,4]<-rep(TAC2019,each=nsim*nMPs)
+    # MPs[[1]]<-c("CurC100","CurC100")
 
   for(MP in 1:nMPs){
 
@@ -635,58 +727,90 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
     cat("\n")
     flush.console()                                                  # update the console
 
-    #TAC<-array(NA,c(nsim,nAss,proyears+1))
-    #TAC[,,1]<-array(rep(curTAC,each=nsim),c(nsim,nAss))
-
-    #TAC<-array(NA,c(nsim,nAss)
-    TAC<-array(rep(curTAC,each=nsim),c(nsim,nAss))
     #for(i in 1:2)dset[[i]]$MPrec<-rep(curTAC[i],nsim)
 
     for(y in nyears:(nyears+proyears)){
+      # y<-y+1
+      if(y==nyears){ # 2016
+        TAC<-TACtrial<-array(rep(TAC2016,each=nsim),c(nsim,nAss))
+        testC[testCind]<-TAC[testCind[,c(1,5)]]*TACdist[testCind] # predicted catch by TACapply(testC,c(1,5),sum)
+        aggC<-apply(testC,1:4,sum)
+        #apply(testC,c(1,5),sum)==TAC; apply(testC[1,,,,],c(2,4),sum)
+      } else if (y==nyears+1){ # 2017
+        TAC<-TACtrial<-array(rep(TAC2017,each=nsim),c(nsim,nAss))
+        testC[testCind]<-TAC[testCind[,c(1,5)]]*TACdist[testCind] # predicted catch by TAC
+        aggC<-apply(testC,1:4,sum)
+      } else if (y==nyears+2){ # 2018
+        TAC<-TACtrial<-array(rep(TAC2018,each=nsim),c(nsim,nAss))
+        testC[testCind]<-TAC[testCind[,c(1,5)]]*TACdist[testCind] # predicted catch by TAC
+        aggC<-apply(testC,1:4,sum)
+      } else if(y==nyears+3){ # 2019
+        TAC<-TACtrial<-array(rep(TAC2019,each=nsim),c(nsim,nAss))
+        testC[testCind]<-TAC[testCind[,c(1,5)]]*TACdist[testCind] # predicted catch by TAC
+        aggC<-apply(testC,1:4,sum)
+      }
+      # y<-y+1; print(y) # debugging
 
-      # y<-y+1 # debugging
-      #for(y in nyears:(nyears+2)){
       cat(".")
 
       if(y%in%upyrs){# Operate MP S P A Y M R
 
         # Simulate indices ----------------------------------------------
-        # if new data are required
 
-        if(y!=nyears){
+        Ilev[,1:(y-1),,1]<-apply(Biomass[,,,1:(y-1),,],c(1,4,6),sum)
+        Ilev[,1:(y-1),,2]<-apply(SSB[,,,1:(y-1),,],c(1,4,6),sum)
 
-          Ilev[,(y-interval+1):y,,1]<-apply(Biomass[,,,(y-interval+1):y,,],c(1,4,6),sum)
-          Ilev[,(y-interval+1):y,,2]<-apply(SSB[,,,(y-interval+1):y,,],c(1,4,6),sum)
+        mind<-as.matrix(expand.grid(1:nsim,1:nind,1:(y-1),1:nareas))
+        Ilev_ind<-as.matrix(cbind(mind[,c(1,3,4)],Itype[mind[,2]]))
+        Itemp[mind]<-Ilev[Ilev_ind]*as.integer(Index_areas[mind[,c(2,4)]])
 
-          mind<-as.matrix(expand.grid(1:nsim,1:nind,1:y,1:nareas))
-          Ilev_ind<-as.matrix(cbind(mind[,c(1,3,4)],Itype[mind[,2]]))
-          Itemp[mind]<-Ilev[Ilev_ind]*as.integer(Index_areas[mind[,c(2,4)]])
-          Isim[,,1:y,1]<-apply(Itemp[,,1:y,],1:3,sum,na.rm=T)^(as.integer(!OM@Ibeta_ignore)*array(Istats[,,1],c(nsim,nind,y)))#add hyperstability
-          Isim[,,1:y,1]<-Isim[,,1:y,1]*rep((1+OM@qinc/100)^(1:y),each=nsim*nind)
-          Isim[,,1:y,1]<-Isim[,,1:y,1]*array(lastI/Isim[,,nyears,1],c(nsim,nind,y)) # normalize to last observed year
-          Iobs<-Isim[,,1:y,1]*Isim[,,1:y,2] # Note last observation is missing (not available SSB for current year recommendation)
-
-          # if additional data are required
-          nuy<-(upyrs[match(y,upyrs)-1]):(y-1)
-          nCAA<-sampCatch(apply(C[,,,nuy,,,],c(1,3,4),sum),.Object@nCAAobs)
-          CAA<-abind(CAA,nCAA,along=3)
-          CAL<-abind(CAL,makeCAL3(nCAA,OM@iALK[,,nyears,,]),along=3)
+        if(OM@Ibeta_ignore){ # don't add hyperstability
+          for(i in 1:nind){
+            Isim[,i,(lastobs[i]+1):(y-1),1]<-apply(Itemp[,i,(lastobs[i]+1):(y-1),],1:2,sum,na.rm=T)
+          }
+        }else{
+          for(i in 1:nind){# add hyperstability
+            Isim[,i,(lastobs[i]+1):(y-1),1]<-apply(Itemp[,i,(lastobs[i]+1):(y-1),],1:2,sum,na.rm=T)^array(Istats[,i,1],c(nsim,nind,(y-1)))#add hyperstability
+          }
+        }
+        # This is probably the dodgy code vvvvv!!!
+        for(i in 1:nind){
+          Isim[,i,(lastobs[i]+1):(y-1),1]<-Isim[,i,(lastobs[i]+1):(y-1),1]*(1+OM@qinc/100)^(1:((y-1)-lastobs[i]))
+          imod<-1/Isim[,i,lastobs[i],2] # The error differential between last observation and first simulated observation
+          Isim[,i,(lastobs[i]+1):(y-1),1]<-Isim[,i,(lastobs[i]+1):(y-1),1]*(lastI[,i]*imod)/Isim[,i,lastobs[i]+1,1] # normalize to last observed year
         }
 
+        Iobs<-Isim[,,1:(y-1),1]
+
+
+        # if additional data are required
+        if(y==nyears+4){
+          nuy<-nyears:(y-3)
+        }else{
+          nuy<-(upyrs[match(y,upyrs)-1]):(y-1)
+        }
+
+        nCAA<-sampCatch(apply(C[,,,nuy,,,],c(1,3,4),sum,na.rm=T),.Object@nCAAobs)
+        CAA<-abind(CAA,nCAA,along=3)
+        CAL<-abind(CAL,makeCAL3(nCAA,OM@iALK[,,nyears,,]),along=3)
+
         for(AS in 1:nAss){
+
           #SPAYMRF
           AA<-Assess_data[AS,]
           nA<-sum(AA)
-          dset[[AS]]<-list("Cobs"=apply(C[,,,1:(y-1),,AA,]*array(Wt_age[,,,nyears],c(nsim,npop,nages,y-1,nsubyears,nA,nfleets)),c(1,4),sum)*.Object@Cerr[,1:(y-1)],
-                           "Iobs"=Iobs[,,1:y-1],
+          Cobs<-apply(C[,,,1:(y-3),,AA,]*array(Wt_age[,,,nyears],c(nsim,npop,nages,y-3,nsubyears,nA,nfleets)),c(1,4),sum,na.rm=T)*.Object@Cerr[,1:(y-3)]
+
+          dset[[AS]]<-list("Cobs"=cbind(Cobs,.Object@TAC[,MP,AS,y-nyears+1-2]),
+                           "Iobs"=Iobs[,,1:(y-2)],
                            "K"=OM@Kmu[,AS]*.Object@Kb,        # for now these assume same growth by stock
                            "Linf"=OM@Linfmu[,AS]*.Object@Kb,  # for now these assume same growth by stock
                            "t0"=OM@t0[,AS],                   # no error in t0
-                           "M"=OM@M[,AS,,(y-1)]*.Object@Mb,  # assume AS is same as stock
+                           "M"=OM@M[,AS,,(y-2)]*.Object@Mb,  # assume AS is same as stock
                            #"Bt"=apply(N[,,,y-1,nsubyears,AA]*
                             #            array(Wt_age[,,,nyears]*OM@mat[,,,nyears],c(nsim,npop,nages,nA)),1,sum)*.Object@Bterr[,(y-1)],#apply(VBA[,,,(y-1),4,],1,sum)*.Object@Bterr[,(y-1)], # you were here
-                           "Bt"=apply(N[,,,y-1,nsubyears,AA]*
-                                        array(Wt_age[,,,nyears],c(nsim,npop,nages,nA))*exp(-Ftot[,,,AA]),1,sum)*.Object@Bterr[,y-1],#
+                           "Bt"=apply(N[,,,y-2,nsubyears,AA]*
+                                        array(Wt_age[,,,nyears],c(nsim,npop,nages,nA))*exp(-Ftot[,,,AA]),1,sum)*.Object@Bterr[,y-2],#
                            "MSY"=OM@MSY[,AS]*.Object@MSYb,
                            "BMSY"=OM@BMSY[,AS]*.Object@BMSYb,
                            "UMSY"=OM@UMSY[,AS]*.Object@FMSYb,
@@ -704,26 +828,54 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
                            "CAL"=CAL,
                            "CAL_bins"=CAL_bins,
                            "MPrec"=TAC[,AS],
-                           "TAC"=matrix(.Object@TAC[,MP,AS,1:(y-nyears+1)],ncol=(y-nyears+1),nrow=nsim)
+                           "TAC"=matrix(.Object@TAC[,MP,AS,1:(y-nyears+1)],ncol=(y-nyears+1),nrow=nsim),
+                           "curTAC"=rep(TAC2018[AS],nsim)
                            )
+        }
+
+        for(AS in 1:nAss){
+          #SPAYMRF
+          AA<-Assess_data[AS,]
 
           assign("dset",dset,envir=globalenv()) # debugging
           if(sfIsRunning())sfExport("dset")
-          if(MPs[[MP]][AS]=="XSA"|!sfIsRunning()) TAC[,AS]<-sapply(1:nsim,get(MPs[[MP]][AS]),dset[[AS]])
-          if(MPs[[MP]][AS]!="XSA") TAC[,AS]<-sfSapply(1:nsim,get(MPs[[MP]][AS]),dset[[AS]])
-          if(y<allyears).Object@TAC[,MP,AS,y-nyears+2]<-TAC[,AS]
+          #if(MPs[[MP]][AS]=="XSA"|!sfIsRunning()) TACtrial[,AS]<-sapply(1:nsim,get(MPs[[MP]][AS]),dset[[AS]])
+          if(class(get(MPs[[MP]][AS]))=="MP"){
+            if(sfIsRunning()&!MSEparallel){
+              TACtrial[,AS]<-sfSapply(1:nsim,get(MPs[[MP]][AS]),dset[[AS]])
+            }else{
+              TACtrial[,AS]<-sapply(1:nsim,get(MPs[[MP]][AS]),dset[[AS]])
+            }
+          }else if(class(get(MPs[[MP]][AS]))=="MSMP"){
+            if(sfIsRunning()&!MSEparallel){
+              TACtrial[,AS]<-sfSapply(1:nsim,get(MPs[[MP]][AS]),dset,AS=AS)
+            }else{
+              TACtrial[,AS]<-sapply(1:nsim,get(MPs[[MP]][AS]),dset,AS=AS)
+            }
+          }
+
+          if(MPs[[MP]][AS]!="ZeroC"){
+            TACmax=(1+maxTAC[AS])*TAC[,AS]
+            TACmin=(max(0.01,1-maxTAC[AS]))*TAC[,AS]
+            cond=TACtrial[,AS]<TACmin
+            TACtrial[cond,AS]=TACmin[cond]
+            cond=TACtrial[,AS]>TACmax
+            TACtrial[cond,AS]=TACmax[cond]
+          }
+
+          if(y<allyears).Object@TAC[,MP,AS,y-nyears+2]<-TAC[,AS]<-TACtrial[,AS]
 
         }
 
-        testC[testCind]<-TAC[testCind[,c(1,5)]]*Fdist[testCind[,c(1:4)]]*Allocation[testCind[,c(5,4)]] # predicted catch by TAC
+        testC[testCind]<-TAC[testCind[,c(1,5)]]*TACdist[testCind] # predicted catch by TAC
 
         #nsim, nsubyears, nareas, nfleets
         aggC<-apply(testC,1:4,sum)
+        #round(apply(aggC,3,sum)/sum(aggC)*100,1)
         # apply(aggC,1,sum)==apply(TAC,1,sum) # simulation totals match?
 
       }else{
         .Object@TAC[,MP,,y-nyears+2]<-.Object@TAC[,MP,,y-nyears+1]
-
       } # end of upyrs
 
       SPAYMR[,4]<-y
@@ -737,6 +889,7 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
       # testC [nsim,nsubyears,nareas,nfleets,nAss]
 
       for(m in 1:nsubyears){
+        #  m<-m+1
 
         SPAYMR[,5]<-m
         SPAM<-SPAYMR[,c(1:3,5)]
@@ -752,35 +905,85 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
         }
 
         # move fish spaymrr
-
-        N[,,,y,m,]<-domov(N[,,,y,m,],mov[,,,m,,])
+        mi<-movIndex[y]
+        N[,,,y,m,]<-domov(N[,,,y,m,],mov[,,,mi,m,,])
 
         Biomass[,,,y,m,]<-N[,,,y,m,]*array(Wt_age[,,,nyears],c(nsim,npop,nages,nareas))
 
-        VB[SPAYMRF2]<-N[SPAYMR2]*Wt_age[SPAL]*sel[SPARF2]                    # Calculate vunerable biomass
+        #VB[SPAYMRF2]<-N[SPAYMR2]*Wt_age[SPAL]*sel[SPARF2]                    # Calculate vunerable biomass
 
         Btemp<-apply(Biomass[,,,y,m,],c(1,4),sum)
 
+        for(AS in 1:nAss){ # Max F redistribution at the catch-at-numbers scale
+
+          AA<-Assess_data[AS,]
+          testU<-aggC[,m,AA,]/array(Btemp[,AA],dim(aggC[,m,AA,])) # implied harvest rate
+          cond<-testU>0.8
+          cond[is.na(cond)]<-T
+          Cunder<-array(0,c(nsim,sum(AA),nfleets))
+          Cunder[cond]<-aggC[,m,AA,][cond]*(testU[cond]-0.8)/testU[cond]
+          aggC[,m,AA,][cond]<-aggC[,m,AA,][cond]-Cunder[cond]
+          CunderT<-apply(Cunder,1,sum)
+          Cdist<-array(0,c(nsim,sum(AA),nfleets))
+          Cdist[!cond]<-aggC[,m,AA,][!cond]
+          Cdist<-(Cdist/array(apply(Cdist,1,sum,na.rm=T),c(nsim,sum(AA),nfleets)))*array(CunderT,c(nsim,sum(AA),nfleets))
+          aggC[,m,AA,]<-aggC[,m,AA,]+Cdist
+
+        }
         testU<-aggC[,m,,]/array(Btemp,dim(aggC[,m,,])) # implied harvest rate
+
         #Fp<-(-log(1-(do.call(IE,list(testU))))) # subject to implementation error
         #testC2<-(1-exp(-Fp))*array(Btemp,dim(aggC[,m,,]))
         testC2<-do.call(IE,list(testU))*array(Btemp,dim(aggC[,m,,]))
 
         # apply(testC2,1,sum)==apply(aggC[,m,,],1,sum) # simulation totals match?
+        # apply(testC2[,1:4,],1:2,sum)==apply(aggC[,m,1:4,],1:2,sum) # simulation totals match?
 
         CAdist[SPRFA2]<-N[SPAYMR2]*Wt_age[SPAL]*sel[SPARF2] # predicted magnitude of catch in each strata
+        CAdist[CAdist<tiny]<-tiny
         CAdistsum<-apply(CAdist,c(1,3,4),sum)                # total in each sim, region and fleet
         CAdist[SPRFA2]<-CAdist[SPRFA2]/CAdistsum[SPRFA2[,c(1,3,4)]] # fraction in each stock and age class per sim region and fleet
         CAdist[is.na(CAdist)]<-0
 
         C[SPAYMRF2]<-testC2[SRF2]*CAdist[SPRFA2]
-
         C[SPAYMRF2][is.na(C[SPAYMRF2])]<-0
+
         # apply(C[,,,y,m,,],1,sum,na.rm=T)==apply(testC2,1,sum)
+        # apply(C[,,,y,m,1:4,],c(1,4),sum,na.rm=T)==apply(testC2[,1:4,],1:2,sum)
         C[SPAYMRF2]<-C[SPAYMRF2]/Wt_age[SPAL] # divide by weight to get numbers
-        Up<-array(C[SPAYMRF2]/N[SPAYMR2],c(nsim,npop,nages,nareas,nfleets)) # additional check on maximum / minimum U
-        Up[is.na(Up)|Up<0.0001]<-0.0001   # otherwise you can't generate some of the automatic fishery data
-        Up[Up>0.9]<-0.9
+
+        test1<-apply(C[,,,y,m,Assess_data[1,],],1:2,sum)
+        test2<-apply(C[,,,y,m,Assess_data[2,],],1:2,sum)
+
+        for(AS in 1:nAss){ # Max F redistribution at the catch-at-numbers scale
+
+          AA<-Assess_data[AS,]
+          Up<-C[,,,y,m,AA,]/array(N[,,,y,m,AA],c(nsim,npop,nages,sum(AA),nfleets)) # additional check on maximum / minimum U
+          Up[is.na(Up)]<-0
+          cond<-Up>0.8
+          Cunder<-array(0,c(nsim,npop,nages,sum(AA),nfleets))
+          Cunder[cond]<-C[,,,y,m,AA,][cond]*(Up[cond]-0.8)/Up[cond]
+          C[,,,y,m,AA,][cond]<-C[,,,y,m,AA,][cond]-Cunder[cond]
+          CunderT<-apply(Cunder,1:3,sum)
+          Cdist<-array(0,c(nsim,npop,nages,sum(AA),nfleets))
+          Cdist[!cond]<-C[,,,y,m,AA,][!cond]
+          Cdist<-(Cdist/array(apply(Cdist,1:3,sum,na.rm=T),c(nsim,npop,nages,sum(AA),nfleets)))*array(CunderT,c(nsim,npop,nages,sum(AA),nfleets))
+          C[,,,y,m,AA,]<-C[,,,y,m,AA,]+Cdist
+          #Fracunder<-apply(Cunder,c(1,3),sum)/apply(C[,,,y,m,AA,],c(1,3),sum)
+          #C[,,,y,m,AA,][!cond]<-C[,,,y,m,AA,][!cond]*(1/(1-array(Fracunder,c(nsim,npop,nages,sum(AA),nfleets))))[!cond]
+        }
+        C[SPAYMRF2][is.na(C[SPAYMRF2])]<-0
+        test12<-apply(C[,,,y,m,Assess_data[1,],],1:2,sum)
+        test22<-apply(C[,,,y,m,Assess_data[2,],],1:2,sum)
+        testW<-array(C[SPAYMRF2]*Wt_age[SPAL],c(nsim,npop,nages,nareas,nfleets)) # divide by weight to get numbers
+        # apply(testW,1,sum,na.rm=T)==apply(testC2,1,sum)
+        # apply(testW[,,,1:4,],c(1,4),sum,na.rm=T)==apply(testC2[,1:4,],1:2,sum)
+        # apply(testW[,,,1:4,],c(1,4),sum,na.rm=T)== apply(aggC[,m,1:4,],1:2,sum)
+        # apply(testW[,,,1:4,],1,sum,na.rm=T)== apply(aggC[,m,1:4,],1,sum)
+
+        Up<-C[,,,y,m,,]/array(N[,,,y,m,],c(nsim,npop,nages,nareas,nfleets))
+        Up[is.na(Up)|Up<tiny]<-tiny # otherwise you can't generate some of the automatic fishery data
+        Up[Up>0.95]<-0.95
         FM[SPAYMRF2]<-(-log(1-Up[SPARF2]))
 
         Ftot<-apply(FM[,,,y,m,,],1:4,sum,na.rm=T)
@@ -792,42 +995,31 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
 
           if(Recsubyr[pp]==m){
 
-            SSBtemp<-apply(SSB[,pp,,y,m,],c(1,3),sum)*canspawn[,pp,] # viable spawning biomass
+            SSBtemp<-apply(SSB[,pp,,y,m,],c(1,3),sum)#*canspawn[,pp,] # viable spawning biomass
             spawnr<-SSBtemp/array(apply(SSBtemp,1,sum),dim(SSBtemp))
             N[,pp,nages,y,m,]<-N[,pp,nages,y,m,]+N[,pp,nages-1,y,m,] # plus group
             N[,pp,2:(nages-1),y,m,]<-N[,pp,1:(nages-2),y,m,]
+            maxind<-min(y-nyears+1,dim(OM@Recind)[2])
+            SRno<-OM@Recind[pp,maxind]
+            SSBpR=apply(surv[,pp,]*Wt_age[,pp,,nyears]*mat[,pp,,nyears],1,sum)  # SSBpR both this and SSB0 are now dynamic
+            R0<-OM@Recpars[,SRno,2]
+            SSB0=R0*SSBpR    #// Unfished Spawning Stock Biomass
+            SSBt<-apply(SSB[,pp,,y,m,],1,sum)
 
-            if(y==nyears){
+            if(OM@Rectype[SRno]=="BH"){
 
-              N[,pp,1,y,m,]<-spawnr*array(Rec[,pp,y],dim(spawnr)) # Initial recruitment distributed by viable spawning biomass
+              h<- OM@Recpars[,SRno,1]
+              N[,pp,1,y,m,]<-Pe[,pp,y]*spawnr*((0.8*R0*h*SSBt) / (0.2*SSBpR*R0*(1-h) + (h-0.2)*SSBt))
 
-            }else{
+            }else{ # hockey stick
 
-              SSBt<-apply(SSB[,pp,,y,m,],1,sum)
-              Regime<-OM@Recind[,y-nyears]
-              Rectype<-OM@Rectype[Regime,pp] # rec changes at the same time for both stocks
-              #procmu <- -0.5*(OM@Reccv[,pp])^2
-              #Pe<-exp(rnorm(nsim,procmu,OM@Reccv[,pp]))
-              # OM@Recpars [nsim, pp, regime,par]
-              R0<-OM@Recpars[cbind(1:nsim,rep(pp,nsim),Regime,rep(2,nsim))]
-              SSBpR<-apply(surv[,pp,]*OM@mat[,pp,,nyears]*OM@Wt_age[,pp,,nyears],1,sum) # This R0 dependent so needs updating for varying future R0s
-              SSB0<-R0*SSBpR
-              #SSBt/SSB0
+              inflect<-OM@Recpars[,SRno,1]
+              N[,pp,1,y,m,]<-Pe[,pp,y]*spawnr*R0
+              cond<-SSBt<(SSB0*inflect)
+              N[cond,pp,1,y,m,]<-N[cond,pp,1,y,m,]*SSBt[cond]/(SSB0[cond]*inflect[cond])
 
-              if(Rectype[1]=="BH"|Rectype[1]=="BH_R0"){ # currently rectypes change together
-
-                h<-OM@Recpars[cbind(1:nsim,rep(pp,nsim),Regime,rep(1,nsim))]
-                N[,pp,1,y,m,]<-Pe[,pp,y]*spawnr*(    (0.8*R0*h*SSBt) / (0.2*SSBpR*R0*(1-h) + (h-0.2)*SSBt))
-
-              }else if(Rectype[1]=="HS"){
-
-                inflect<-OM@Recpars[cbind(1:nsim,rep(pp,nsim),Regime,rep(1,nsim))]
-                N[,pp,1,y,m,]<-Pe[,pp,y]*spawnr*R0
-                cond<-SSBt<(SSB0*inflect)
-                N[cond,pp,1,y,m,]<-N[cond,pp,1,y,m,]*SSBt[cond]/(SSB0[cond]*inflect[cond])
-
-              }
             }
+
           } # if its the right subyear
         } # end of pop
       } # end of subyear
@@ -835,47 +1027,78 @@ setMethod("initialize", "MSE", function(.Object,OM=OM_example,Obs=Good_Obs,MPs=l
     } # end of year
 
     # Store results
-
-    SSBmu<-apply(SSB,c(1:4,6),mean)
+    SSBmu<-apply(SSB,c(1:4,6),mean) #nsim,npop,nages,allyears,nareas
     .Object@SSB[MP,,,]<-apply(SSBmu,c(1:2,4),sum)
 
+    # Hack to get SSB by assessment area:
+    for(aa in 1:2).Object@SSBa[MP,,aa,]<-apply(SSBmu[,,,,MPareas==aa],c(1,4),sum)
     rm(SSBmu)
-
-    Cind<-expand.grid(MP,
-                      SPAYMRF2)
 
     Ctemp<-apply(C[,,,1:allyears,,,]*array(Wt_age[,,,nyears],dim(C[,,,1:allyears,,,])),c(1,2,4,6),sum)
     Ctemp<-apply(Ctemp,c(1,3,4),sum)# SYR
 
-    for(pp in 1:npop).Object@C[MP,,pp,]=apply(Ctemp[,,MPareas==pp],1:2,sum)
-   # .Object@C[MP,,,]<-apply(C[,,,1:allyears,,,]*array(Wt_age[,,,nyears],dim(C[,,,1:allyears,,,])),c(1,2,4),sum)
+    for(aa in 1:2).Object@C[MP,,aa,]=apply(Ctemp[,,MPareas==aa],1:2,sum)
 
     SSB2<-apply(N[,,,1:allyears,4,]*array(mat[,,,nyears]*Wt_age[,,,nyears],c(nsim,npop,nages,allyears,nareas)),c(1,2,4),sum)
     .Object@D[MP,,,]<-SSB2/array(SSB2[,,1],dim(SSB2))
 
     B<-apply(N[,,,1:allyears,4,]*array(Wt_age[,,,nyears],c(nsim,npop,nages,allyears,nareas)),c(1:2,4),sum)
-    #Bthen<-apply((SSN[,,,1,4,]+NSN[,,,1,4,])*array(Wt_age[,,,1],c(nsim,npop,nages,nareas)),1:2,sum)
     .Object@B_BMSY[MP,,,]<-B/array(OM@BMSY,dim(B))
 
     U<-.Object@C[MP,,,]/(.Object@C[MP,,,]+B)
     .Object@F_FMSY[MP,,,]<-U/apply(array(OM@UMSY[,],c(nsim,npop)),1,mean)
 
     cat("\n")
+
   } # end of MP
 
-  .Object@SSB0<-apply(array(OM@muR,dim(surv))*surv*Wt_age[,,,nyears]*mat[,,,nyears],1:2,sum)
+  .Object@SSB0<-apply(array(OM@Recpars[,OM@Recind[,1],2],dim(surv))*surv*Wt_age[,,,nyears]*mat[,,,nyears],1:2,sum)
 
   # This is all about calculating the equilibrium unfished SSB0 for the various recruitment types in the future
-  SSB0proj<-array(NA,c(nsim,npop,proyears))
-  SSB0ind<-TEG(dim(SSB0proj))
-  parind<-cbind(SSB0ind[,1:2],OM@Recind[SSB0ind[,c(1,3)]],rep(2,nrow(SSB0ind)))
-  SSB0proj[SSB0ind]<-OM@Recpars[parind]*apply(surv*Wt_age[,,,nyears]*mat[,,,nyears],1:2,sum)[SSB0ind[,1:2]]
-  .Object@SSB0proj<-SSB0proj
 
+
+  dynB0h<-array(NA,c(nsim,npop,nyears))
+  dynB0<-array(NA,c(nsim,npop,proyears))
+  #SSB0ind<-TEG(dim(SSB0proj))
+  #parind<-cbind(SSB0ind[,1:2],OM@Recind[SSB0ind[,c(1,3)]],rep(2,nrow(SSB0ind)))
+  #SSB0proj[SSB0ind]<-OM@Recpars[parind]*apply(surv*Wt_age[,,,nyears]*mat[,,,nyears],1:2,sum)[SSB0ind[,1:2]]
+  #.Object@SSB0proj<-SSB0proj
+
+  for(pp in 1:npop){
+
+    R0<-OM@hR0[,pp,1]
+
+    SSBpR=apply(surv[,pp,]*Wt_age[,pp,,1]*mat[,pp,,1],1,sum)  # SSBpR both this and SSB0 are now dynamic
+
+    SSB=R0*SSBpR
+    dynB0h[,pp,1]<-SSB
+    N<-R0*surv[,pp,]
+    for(y in 2:nyears){
+      Nplus<-N[,nages]*exp(-OM@M[,pp,nages,1])
+      for(aa in nages:2)N[,aa]<-N[,aa-1]*exp(-OM@M[,pp,aa-1,1])
+      N[,1]<-OM@hR0[,pp,y]
+      N[,nages]<-N[,nages]+Nplus
+      dynB0h[,pp,y]<-apply(Wt_age[,pp,,1]*mat[,pp,,1]*N,1,sum)
+
+    }
+
+
+    for(y in 1:proyears){
+      Nplus<-N[,nages]*exp(-OM@M[,pp,nages,1])
+      for(aa in nages:2)N[,aa]<-N[,aa-1]*exp(-OM@M[,pp,aa-1,1])
+      SRno<-OM@Recind[pp,y]
+      N[,1]<-OM@Recpars[,SRno,2]
+      N[,nages]<-N[,nages]+Nplus
+      dynB0[,pp,y]<-apply(Wt_age[,pp,,1]*mat[,pp,,1]*N,1,sum)
+    }
+
+  }
+
+  .Object@dynB0<-dynB0
   .Object@MPs<-MPs
   .Object@area_defs<-OM@area_defs
   .Object@areanams<-OM@areanams
-
+  invisible(gc()) # garbage collection is automatic in R, I'm doing this mannual to test memory requirements for computers with less RAM
   .Object
 
 })

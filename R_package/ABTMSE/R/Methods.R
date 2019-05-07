@@ -24,9 +24,9 @@ setMethod("plot", signature(x = "OM"),function(x,outfile=NA){
       }
     }}
 
-    #pid<-3
-    #nplots<-ceiling(.Object@npop/2)
-   # if(nplots>2)pid<-(((1:nplots)*2)-1)[2:nplots]
+    # pid<-3
+    # nplots<-ceiling(.Object@npop/2)
+    # if(nplots>2)pid<-(((1:nplots)*2)-1)[2:nplots]
     if(!is.na(outfile))jpeg(paste(getwd(),"/Images/",outfile,".jpg",sep=""),res=300,units="in",width=8,height=8)
     par(mfrow=c(.Object@nma,.Object@npop*.Object@nsubyears),mai=c(0.1,0.1,0.01,0.01),omi=c(0.4,0.4,0.6,0.05))
 
@@ -107,12 +107,13 @@ setMethod("plot", signature(x = "OMd"),function(x){
 #})
 setMethod("plot",
           signature(x = "MSE"),
-          function(x,quants=c(0.05,0.5,0.95),nworms=10, startyr=2016,rev=F){
+          function(x,quants=c(0.05,0.5,0.95),nworms=10, startyr=2019,modelyr=55,rev=T,byarea=F,MSY=T){
 
             MSE<-x
             nsim<-MSE@nsim
+            nyears<-MSE@nyears
             proyears<-MSE@proyears
-            allyears<-MSE@proyears+MSE@nyears
+            allyears<-proyears+nyears
             nMPs<-MSE@nMPs
 
             MSE@C<-MSE@C/1000
@@ -120,20 +121,31 @@ setMethod("plot",
             #somenames=c("Green Kobe","Final depletion","AAV Yield","Yield","Yield 5% DR", "Yield 10% DR", "Yield -5% DR")
 
             #stats<-getperf(MSE)
-            yrs<-startyr:(startyr+MSE@proyears-1)
-            refyears<-MSE@nyears+1:MSE@proyears-1
+            yrs<-startyr:(startyr+MSE@proyears-4)
+            refyears<-modelyr:(modelyr+MSE@proyears-4)
             worms<-1:min(nworms,MSE@nsim)
 
-            xtick<-pretty(seq(yrs[1],yrs[MSE@proyears],length.out=3))
+            xtick<-pretty(seq(yrs[1],yrs[length(yrs)],length.out=3))
 
             SSBcol="light blue"
             Catcol="light grey"
 
             Cq<-apply(MSE@C,c(1,3,4),quantile,p=quants)
-            Clim<-cbind(rep(0,MSE@npop),apply(Cq[,,,refyears],3,max))
-            SSBnorm<-MSE@SSB/array(MSE@SSB[,,,MSE@nyears],dim(MSE@SSB))
-            SSBq<-apply(SSBnorm,c(1,3,4),quantile,p=quants)
-            SSBlim<-cbind(rep(0,MSE@npop),apply(SSBq,3,max))
+            Clim<-cbind(rep(0,MSE@npop),max(apply(Cq[,,,refyears],3,max),5000))
+            if(!MSY){
+              if(byarea)SSBnorm<-MSE@SSBa/array(MSE@SSBa[,,,MSE@nyears],dim(MSE@SSBa))
+              if(!byarea)SSBnorm<-MSE@SSB/array(MSE@SSB[,,,MSE@nyears],dim(MSE@SSB))
+            }else{
+              SSBnorm<-array(NA,c(nMPs,nsim,2,allyears)) # because you only have dynB0 for future years
+              dB0yrs<-(proyears-length(refyears))+1:length(refyears)
+              #SSBnorm[,,,refyears]<-MSE@SSBa[,,,refyears]/array(rep(MSE@dynB0[,,dB0yrs],each=nMPs)/rep(rep(MSE@SSBMSY_SSB0,each=nMPs),length(refyears)),c(nMPs,nsim,2,length(refyears)))
+              SSBnorm[,,,refyears]<-MSE@SSB[,,,refyears]/array(rep(MSE@dynB0[,,dB0yrs],each=nMPs)*rep(rep(MSE@SSBMSY_SSB0,each=nMPs),length(refyears)),c(nMPs,nsim,2,length(refyears)))
+              SSBnorm[,,,1:(modelyr-1)]<-SSBnorm[,,,modelyr]
+            }
+
+
+            SSBq<-apply(SSBnorm,c(1,3,4),quantile,p=quants,na.rm=T)
+            SSBlim<-cbind(rep(0,MSE@npop),apply(SSBq,3,max,na.rm=T))
 
             linecols<-rep(c("black","orange","blue","red","green","light grey","grey","pink","purple","brown"),100)
 
@@ -163,8 +175,8 @@ setMethod("plot",
                 plot(range(yrs),Clim[pp,],axes=F,col="white",xlab="",ylab="",ylim=Clim[pp,])
                 abline(h=ytick,col=gridcol)
                 abline(v=xtick,col=gridcol)
-                polygon(c(yrs,yrs[MSE@proyears:1]),
-                        c(Cq[1,MP,pp,refyears],Cq[3,MP,pp,refyears[MSE@proyears:1]]),
+                polygon(c(yrs,yrs[length(yrs):1]),
+                        c(Cq[1,MP,pp,refyears],Cq[3,MP,pp,refyears[length(yrs):1]]),
                         col=Catcol,border=F)
                 lines(yrs,Cq[2,MP,pp,refyears],lwd=1.5,col="black")
                 if(MP<MSE@nMPs)axis(1,at=xtick,labels=NA)
@@ -193,8 +205,8 @@ setMethod("plot",
                 plot(range(yrs),SSBlim[pp,],axes=F,col="white",xlab="",ylab="",ylim=SSBlim[pp,])
                 abline(h=ytick,col=gridcol)
                 abline(v=xtick,col=gridcol)
-                polygon(c(yrs,yrs[MSE@proyears:1]),
-                        c(SSBq[1,MP,pp,refyears],SSBq[3,MP,pp,refyears[MSE@proyears:1]]),
+                polygon(c(yrs,yrs[length(yrs):1]),
+                        c(SSBq[1,MP,pp,refyears],SSBq[3,MP,pp,refyears[length(yrs):1]]),
                         col=SSBcol,border=F)
                 lines(yrs,SSBq[2,MP,pp,refyears],lwd=1.5,col="black")
                 if(MP<MSE@nMPs)axis(1,at=xtick,labels=NA)
@@ -202,7 +214,7 @@ setMethod("plot",
                 abline(h=0)
                 abline(h=1,lty=2)
                 axis(2,ytick,labels=ytick)
-                #legend('topright',legend="Relative SSB",bty='n')
+                #legend('topright',legend="SSB relative to 2018",bty='n')
 
                 mtext(MPnams[(MP-1)*2+pp],3,adj=-0.35,line=0.3,cex=0.9)
 
@@ -216,13 +228,14 @@ setMethod("plot",
                 abline(h=0)
                 abline(h=1,lty=2)
 
-                mtext('Relative SSB',3,adj=-0.8,line=-1,cex=0.7)
-
+                if(!MSY)mtext('SSB relative to 2018',3,adj=-0.8,line=-1,cex=0.7)
+                if(MSY)mtext('SSB relative SSB_MSY',3,adj=-0.8,line=-1,cex=0.7)
 
               }
             }
-
-            mtext(MSE@Snames[pind],3,adj=c(0.26,0.78),line=-0.45,outer=T,font=2)
+            texty<-paste(MSE@Snames[pind],"Area")
+            if(!byarea|MSY) texty<-paste(MSE@Snames[pind],"(Catch by area, SSB by stock)")
+            mtext(texty,3,adj=c(0.15,0.85),line=-0.45,outer=T,font=2)
 
           })
 
